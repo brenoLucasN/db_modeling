@@ -1,0 +1,13 @@
+[package]
+name = "dbml-syntax"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+logos.workspace = true
+rowan.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+proptest.workspace = true

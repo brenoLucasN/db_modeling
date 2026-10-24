@@ -1,0 +1,287 @@
+name: spec-driven-ptbr
+version: 1
+description: Fluxo OpenSpec padrão em pt-BR — proposal → specs → design → tasks
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: Documento inicial da proposta descrevendo a change
+    template: proposal.md
+    instruction: |
+      Crie o documento de proposta que estabelece POR QUE esta change é necessária.
+      Escreva em pt-BR, inclusive os títulos de seção.
+
+      Seções:
+      - **Por quê**: 1-2 frases sobre o problema ou a oportunidade. Que problema isso resolve? Por que agora?
+      - **O que muda**: lista de mudanças. Seja específico sobre capabilities novas, modificações ou remoções. Marque mudanças incompatíveis com **INCOMPATÍVEL**.
+      - **Capabilities**: identifique quais specs serão criadas ou modificadas:
+        - **Capabilities novas**: liste as capabilities introduzidas. Cada uma vira um novo `specs/<capability-path>/spec.md`. Nomeie cada capability por um comportamento duradouro do sistema (por exemplo, `export-imagem`), não pelo trabalho desta change (por exemplo, `adicionar-botao-export`). Escolha uma fronteira coesa que possa reunir requirements relacionados conforme o sistema evolui; evite capabilities genéricas demais. Use kebab-case nos segmentos de caminho que introduzir (ex.: `export-imagem` ou `export/mermaid`) e siga a organização de specs existente no projeto.
+        - **Capabilities modificadas**: liste as capabilities existentes cujos REQUIREMENTS mudam. Inclua só se o comportamento no nível da spec mudar (não apenas detalhes de implementação). Cada uma precisa de um arquivo de spec delta. Use o caminho exato existente em `openspec/specs/`. Deixe vazio se nenhum requirement mudar.
+      - **Fora de escopo**: o que esta change explicitamente não faz.
+      - **Impacto**: crates, módulos, dependências e sistemas afetados; ADRs (`openspec/adr/NNNN`) e riscos (R1..R10) tocados.
+
+      IMPORTANTE: a seção Capabilities é crítica. Ela cria o contrato entre as
+      fases de proposta e de specs. Pesquise as specs existentes antes de
+      preenchê-la: rode `openspec list --specs` para o inventário de capabilities
+      do projeto e depois `openspec show "<spec-id>" --type spec --json --no-scenarios`
+      para as que parecerem relacionadas — isso retorna o propósito e os textos
+      dos requirements sem trazer arquivos de spec inteiros para o contexto.
+      Acrescente `--store "<id>"` aos dois comandos só para um store independente
+      registrado, e mantenha `--type spec`: uma change e uma spec com o mesmo nome
+      geram erro de item ambíguo. `openspec list` sem `--specs` lista changes em
+      andamento, não specs — nunca mostra o que o projeto já cobre. Reutilize o
+      caminho exato de uma capability existente em vez de criar um nome quase
+      duplicado. A leitura filtrada é só uma visão geral. Antes de decidir o que
+      já está coberto ou o que deve mudar, leia cada spec relevante por inteiro,
+      incluindo cenários, com `openspec show "<spec-id>" --type spec` (mesma regra
+      de `--store`). Cada capability listada aqui vai precisar de um arquivo de spec.
+
+      Toda change precisa declarar pelo menos uma capability (nova ou
+      modificada) ou abrir mão de specs explicitamente: `openspec validate`
+      rejeita uma change sem deltas, a menos que o `.openspec.yaml` dela defina
+      `skip_specs: true`. Use `skip_specs: true` só quando nenhum comportamento no
+      nível da spec mudar (refatoração pura, ferramentas, docs) — specs descrevem
+      comportamento, então se o comportamento não muda, nenhuma spec deve mudar.
+      Não invente um requirement só para passar na validação.
+
+      Seja conciso (1-2 páginas). Foque no "por quê", não no "como" — detalhes
+      de implementação ficam no design.md.
+
+      Esta é a base — specs, design e tarefas partem daqui.
+    requires: []
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: Especificações detalhadas da change
+    template: spec.md
+    instruction: |
+      Crie os arquivos de especificação que definem O QUE o sistema deve fazer.
+      Escreva em pt-BR. Ficam em inglês só as palavras-chave que a CLI exige:
+      `## Purpose`, `## ADDED/MODIFIED/REMOVED/RENAMED Requirements`,
+      `### Requirement:`, `#### Scenario:`, `SHALL`/`MUST`, `WHEN`/`THEN`, `FROM:`/`TO:`,
+      `**Reason**` e `**Migration**`. Nomes de requirements e cenários, descrições
+      e cláusulas ficam em pt-BR (ex.: "O sistema SHALL exportar o diagrama em PNG").
+
+      Uma spec é um contrato de comportamento, não um plano de implementação.
+
+      Bom conteúdo de spec:
+      - Comportamento observável de que usuários ou sistemas dependem
+      - Entradas, saídas e condições de erro
+      - Restrições externas (segurança, privacidade, confiabilidade, compatibilidade)
+      - Cenários que possam ser testados ou validados explicitamente
+
+      Evite nas specs:
+      - Nomes internos de structs/funções
+      - Escolhas de biblioteca ou framework
+      - Detalhes de implementação passo a passo
+      - Planos de execução detalhados (ficam no design.md ou no tasks.md)
+
+      Teste rápido: se a implementação pode mudar sem mudar o comportamento
+      visível externamente, provavelmente não pertence à spec.
+
+      Crie um arquivo de spec por capability listada na seção Capabilities da proposta.
+      `<capability-path>` é o diretório da spec relativo a `specs/` (por exemplo,
+      `export-imagem` ou `export/mermaid`). Preserve o caminho completo:
+      - Capabilities novas: use o caminho exato da proposta em `specs/<capability-path>/spec.md`. Todo segmento de caminho introduzido na proposta deve estar em kebab-case. Siga a organização existente do projeto; não acrescente um nível de domínio novo quando o projeto usa layout plano.
+      - Capabilities modificadas: use o caminho exato existente em `openspec/specs/<capability-path>/` ao criar o delta em `specs/<capability-path>/spec.md`. Rode `openspec list --specs` para confirmar esse caminho antes de escrever o delta, acrescentando `--store "<id>"` só para um store independente registrado — um caminho digitado errado ou inventado aponta para uma capability que não existe em vez da que você queria. Não mova nem renomeie a capability.
+
+      Escreva os arquivos de spec um de cada vez, para que o usuário veja o
+      progresso e uma execução interrompida mantenha os arquivos já escritos:
+      - Antes de escrever, compare as capabilities listadas na proposta com os
+        arquivos `specs/<capability-path>/spec.md` que já existem e comece pela
+        primeira capability sem arquivo. Não reescreva um arquivo existente a
+        menos que o usuário peça.
+      - Antes de cada arquivo, diga numa linha qual capability está escrevendo.
+      - Escreva cada arquivo assim que terminar o rascunho. Não planeje todos os
+        arquivos antes de escrever o primeiro.
+      - Pare quando toda capability listada na proposta tiver seu arquivo.
+
+      Deve haver pelo menos um arquivo de spec, a menos que o `.openspec.yaml` da
+      change defina `skip_specs: true` (nenhuma mudança de comportamento no nível
+      da spec) — `openspec validate` rejeita uma change sem deltas sem esse
+      marcador. Se a proposta não listar capabilities e `skip_specs` não estiver
+      definido, revise a proposta primeiro.
+
+      Operações de delta (use títulos ##):
+      - **ADDED Requirements**: capabilities novas
+      - **MODIFIED Requirements**: comportamento alterado — MUST incluir o conteúdo atualizado completo
+      - **REMOVED Requirements**: funcionalidades obsoletas — MUST incluir **Reason** e **Migration**
+      - **RENAMED Requirements**: só mudança de nome — use o formato FROM:/TO:
+
+      Formato dos requirements:
+      - Cada requirement: `### Requirement: <nome>` seguido da descrição
+      - Use SHALL/MUST para requisitos normativos (evite should/may)
+      - Cada cenário: `#### Scenario: <nome>` no formato WHEN/THEN
+      - **CRÍTICO**: cenários MUST usar exatamente 4 cerquilhas (`####`). Usar 3 cerquilhas ou marcadores de lista falha em silêncio.
+      - Todo requirement MUST ter pelo menos um cenário.
+      - Mantenha a descrição de cada requirement (o texto entre `### Requirement:` e o primeiro cenário) com no máximo 500 caracteres. `openspec validate` sinaliza descrições maiores em requirements ADDED e na spec principal. É um aviso: a validação normal passa, mas `openspec validate --strict` falha. Ao escrever um requirement novo, descreva um comportamento por requirement: mova exemplos e casos de borda para cenários e divida um requirement que cobre vários comportamentos em blocos `### Requirement:` separados, cada um com seus cenários. Em MODIFIED, mantenha o bloco do requirement existente inteiro; nunca divida, corte ou reescreva texto existente só para caber no tamanho. Divida um requirement longo existente só quando o usuário pedir, numa change feita para isso: em MODIFIED, mantenha o título e todos os cenários e reduza a descrição a um comportamento sem mudar o sentido; depois adicione cada comportamento removido como um requirement ADDED próprio, com seus cenários.
+
+      Só para capabilities novas: a primeira seção da spec delta é `## Purpose` —
+      uma ou duas frases (50+ caracteres, senão `openspec validate --strict`
+      reporta como curta demais) descrevendo para que serve a capability. O
+      archive a copia para a spec principal que cria; sem ela, a nova spec
+      principal fica com um marcador `TBD ... Update Purpose after archive` para
+      preencher à mão. NÃO acrescente `## Purpose` num delta de capability
+      existente — essa spec já tem um, e o do delta é ignorado. Para mudar o
+      Purpose de uma capability existente — inclusive um marcador `TBD` que
+      sobrou — edite `<planningHome.root>/openspec/specs/<capability-path>/spec.md`
+      diretamente. O `planningHome.root` vem da resposta de `openspec instructions
+      ... --json`. Use-o sempre em vez de um caminho relativo ao repositório: ele
+      resolve para o store sempre que a change estiver num — seja por `--store`,
+      por um ponteiro `store:` no projeto ou por um store padrão global — e para o
+      repositório atual nos demais casos. Não tente descobrir qual caso vale; o
+      campo já resolveu.
+
+      Fluxo de requirements MODIFIED:
+      1. Localize o requirement existente em `<planningHome.root>/openspec/specs/<capability-path>/spec.md` (a mesma raiz que considera o store, como acima)
+      2. Copie o bloco INTEIRO do requirement (de `### Requirement:` até todos os cenários)
+      3. Cole sob `## MODIFIED Requirements` e edite para refletir o novo comportamento
+      4. Garanta que o texto do título bata exatamente (ignorando espaços)
+
+      Armadilha comum: usar MODIFIED com conteúdo parcial perde detalhes no archive.
+      Se for acrescentar preocupações novas sem mudar o comportamento existente, use ADDED.
+
+      Exemplo (uma capability nova, então a primeira seção é `## Purpose`):
+      ```
+      # Spec Delta
+
+      ## Purpose
+
+      Permite levar o diagrama para fora do app em formatos de imagem e texto.
+
+      ## ADDED Requirements
+
+      ### Requirement: Exportar diagrama em PNG
+      O sistema SHALL exportar o diagrama atual como PNG na escala escolhida.
+
+      #### Scenario: Export em 2x
+      - **WHEN** o usuário exporta em PNG com escala 2x
+      - **THEN** o sistema gera um arquivo PNG com o dobro da resolução do canvas
+
+      ## REMOVED Requirements
+
+      ### Requirement: Export por captura de tela
+      **Reason**: substituído pelo pipeline cena → SVG → raster
+      **Migration**: usar o painel de export (Ctrl+E)
+      ```
+
+      As specs devem ser testáveis — cada cenário é um caso de teste em potencial.
+    requires:
+      - proposal
+
+  - id: design
+    generates: design.md
+    description: Documento de design técnico com detalhes de implementação
+    template: design.md
+    instruction: |
+      Crie o documento de design que explica COMO implementar a change.
+      Escreva em pt-BR, inclusive os títulos de seção.
+
+      Quando incluir o design.md (crie só se algum destes valer):
+      - Mudança transversal (vários crates/módulos) ou novo padrão de arquitetura
+      - Dependência externa nova ou mudança significativa no modelo de dados
+      - Complexidade de segurança, performance ou migração
+      - Ambiguidade que se beneficia de decisões técnicas antes de codar
+
+      Seções:
+      - **Contexto**: só o estado atual e as restrições necessárias para explicar a abordagem. Referencie a proposta para a motivação em vez de repeti-la (ex.: "Ver proposal.md — Por quê").
+      - **Objetivos / Não objetivos**: o que este design alcança e o que exclui explicitamente. Não repita o escopo da proposta — acrescente só limites no nível do design.
+      - **Decisões**: escolhas técnicas-chave com justificativa (por que X em vez de Y?), alternativas consideradas e em qual crate do workspace cada parte vive.
+      - **Riscos / Trade-offs**: limitações conhecidas, o que pode dar errado. Formato: [Risco] → Mitigação
+      - **Plano de migração**: passos para entregar e estratégia de rollback (se aplicável)
+      - **Perguntas em aberto**: incógnitas que podem ser respondidas depois com
+        segurança, sem mudar as specs, a abordagem ou a divisão de tarefas. Omita se não houver.
+
+      Perguntas em aberto são para incógnitas realmente adiáveis, não para
+      decisões que você pulou. Se uma pergunta mudaria as specs, a abordagem
+      escolhida ou a divisão de tarefas, resolva agora — pergunte ao usuário em
+      vez de chutar.
+
+      Foque em arquitetura e abordagem, não em implementação linha a linha.
+      A proposta cobre o porquê e o quê; o design cobre o como. Referencie a
+      proposta para a motivação e, depois de escritas, as specs para os
+      requirements — se uma seção só os repetiria, aponte para eles.
+
+      Bons documentos de design explicam o "porquê" das decisões técnicas.
+    requires:
+      - proposal
+
+  - id: tasks
+    generates: tasks.md
+    description: Checklist de implementação com tarefas rastreáveis
+    template: tasks.md
+    instruction: |
+      Crie a lista de tarefas que divide o trabalho de implementação.
+      Escreva em pt-BR, inclusive os títulos dos grupos.
+
+      Antes de escrever as tarefas, veja as Perguntas em aberto do design.md. Se
+      alguma mudaria o que será construído, resolva com o usuário primeiro — não
+      embuta uma suposição não declarada na lista de tarefas.
+
+      **IMPORTANTE: siga o template abaixo para tarefas rastreadas.** A fase de apply
+      lê o formato de checkbox para acompanhar o progresso. Uma caixa contendo só `x`
+      conta como concluída, maiúsculo ou minúsculo e com qualquer espaçamento, então
+      `- [ x]` também conta. Qualquer outro marcador, inclusive `- [~]`, `- [-]` e um
+      `- []` vazio, conta como não concluído. Uma linha sem checkbox não é rastreada.
+
+      Diretrizes:
+      - Agrupe tarefas rastreadas relacionadas sob títulos ## numerados
+      - Cada tarefa rastreada MUST ser um checkbox: `- [ ] X.Y Descrição da tarefa`
+      - As tarefas devem ser pequenas o bastante para concluir numa sessão
+      - Ordene as tarefas por dependência (o que precisa vir primeiro?)
+      - Rastreie o trabalho de implementação e verificação que pode ser concluído
+        antes do archive. Se o fluxo pedido incluir archive ou trabalho que exige a
+        change arquivada, mantenha esses passos como marcadores simples numa seção
+        opcional `## Pendências do fluxo` no fim do tasks.md. Esses marcadores são
+        informação de referência fora do progresso rastreado.
+      - Cada tarefa MUST dizer como verificar a conclusão (um teste, comando,
+        comportamento observável ou artefato entregue). Coloque a verificação na
+        descrição do checkbox da própria tarefa. Use uma tarefa de verificação
+        separada só quando ela checar integração ou comportamento do sistema que
+        atravessa várias tarefas de implementação.
+      - Cada grupo de tarefas MUST entregar os testes e a documentação que o
+        próprio trabalho exige. NÃO junte testes ou documentação num grupo final —
+        quando um grupo tardio exercita pela primeira vez o trabalho de um grupo
+        anterior, as falhas se propagam por todos os grupos intermediários e forçam
+        retrabalho. Um grupo cujo trabalho não exige nenhum dos dois, como estrutura
+        inicial ou configuração de dependências, não carrega nenhum. Um grupo final
+        serve só para verificações de integração, não para os testes e docs devidos
+        por um grupo anterior.
+      - Tarefas que alteram parser/edição incluem teste de snapshot (`insta`) ou de
+        propriedade (`proptest`); tarefas de UI incluem o checklist de qualidade de
+        docs/05-ux.md.
+
+      Exemplo:
+      ```
+      # Tarefas
+
+      ## 1. Estrutura
+
+      - [ ] 1.1 Criar o crate `export` no workspace e verificar que `cargo check` passa
+      - [ ] 1.2 Adicionar `resvg` e `image` ao Cargo.toml do crate e verificar que compila
+
+      ## 2. Implementação
+
+      - [ ] 2.1 Implementar cena → SVG e verificar com teste de snapshot `insta`
+      - [ ] 2.2 Rasterizar SVG em PNG/JPEG e verificar dimensões nas escalas 1x/2x/4x em teste
+      - [ ] 2.3 Documentar o pipeline em docs/03-arquitetura.md e verificar que o exemplo roda como descrito
+      ```
+
+      Quando aplicável, acrescente as pendências do fluxo como marcadores simples, por exemplo:
+      ```
+      ## Pendências do fluxo
+
+      - Arquivar a change depois que os requisitos de revisão do projeto forem atendidos.
+      - Verificar o resultado arquivado.
+      ```
+
+      Consulte as specs para o que precisa ser construído e o design para como construir.
+    requires:
+      - specs
+      - design
+
+apply:
+  requires: [ tasks ]
+  tracks: tasks.md
+  instruction: |
+    Leia os arquivos de contexto, trabalhe nas tarefas pendentes e marque-as como concluídas conforme avança.
+    Pause se encontrar bloqueios ou precisar de esclarecimento.

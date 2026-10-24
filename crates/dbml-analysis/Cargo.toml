@@ -1,0 +1,13 @@
+[package]
+name = "dbml-analysis"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+schema.workspace = true
+dbml-syntax.workspace = true
+rowan.workspace = true
+
+[dev-dependencies]
+insta.workspace = true

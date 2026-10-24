@@ -1,0 +1,18 @@
+# Cargo (cobre também tools/*/target)
+target/
+
+# Claude Code (agentes, skills, comandos e configurações)
+.claude/
+
+# Editores e SO
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Artefatos de teste (insta, screenshots, perfis)
+*.snap.new
+*.pending-snap
+/screenshots/
+*.profraw

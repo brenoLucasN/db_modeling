@@ -1,0 +1,13 @@
+# Ferramenta de build da identidade visual: SVG -> PNG (vários tamanhos) + ICO.
+# Fora do workspace principal; rode com: cargo run --manifest-path tools/render-icons/Cargo.toml
+[package]
+name = "render-icons"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+resvg = "=0.45.1"
+image = { version = "=0.25.10", default-features = false, features = ["png", "ico"] }

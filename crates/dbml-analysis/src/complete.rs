@@ -1,0 +1,261 @@
+//! Autocomplete sensível ao contexto: palavras-chave no topo, tipos depois do nome
+//! da coluna, configurações dentro de `[...]` e `tabela.coluna` em referências.
+
+use crate::analyze;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionKind {
+    Keyword,
+    Type,
+    Setting,
+    Table,
+    Column,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Completion {
+    pub label: String,
+    /// Texto inserido (pode diferir do rótulo, ex.: `Ref: ` com espaço).
+    pub insert: String,
+    pub kind: CompletionKind,
+    pub detail: String,
+    /// Intervalo (bytes) que a inserção substitui: a palavra em digitação.
+    pub replace: std::ops::Range<usize>,
+}
+
+fn item(label: &str, insert: &str, kind: CompletionKind, detail: &str) -> Completion {
+    Completion {
+        label: label.into(),
+        insert: insert.into(),
+        kind,
+        detail: detail.into(),
+        replace: 0..0,
+    }
+}
+
+const TYPES: [&str; 14] = [
+    "int",
+    "bigint",
+    "smallint",
+    "serial",
+    "varchar(255)",
+    "text",
+    "boolean",
+    "uuid",
+    "timestamp",
+    "date",
+    "decimal(10,2)",
+    "float",
+    "json",
+    "jsonb",
+];
+
+const SETTINGS: [(&str, &str, &str); 8] = [
+    ("pk", "pk", "chave primária"),
+    ("not null", "not null", "obrigatória"),
+    ("unique", "unique", "valor único"),
+    ("increment", "increment", "autoincremento"),
+    ("default", "default: ", "valor padrão"),
+    ("note", "note: ''", "comentário"),
+    ("ref", "ref: > ", "chave estrangeira"),
+    ("null", "null", "aceita nulo"),
+];
+
+/// Retorna sugestões para o cursor em `offset` (bytes). O prefixo já digitado filtra a lista.
+pub fn complete(text: &str, offset: usize) -> Vec<Completion> {
+    let offset = offset.min(text.len());
+    let before = &text[..offset];
+    let line = &before[before.rfind('\n').map_or(0, |i| i + 1)..];
+    // palavra em digitação (inclui `.` para tabela.coluna)
+    let word_start = line
+        .rfind(|c: char| !(c.is_alphanumeric() || c == '_' || c == '.'))
+        .map_or(0, |i| i + 1);
+    let word = &line[word_start..];
+    let ctx = &line[..word_start];
+
+    let depth = before.matches('{').count() as i64 - before.matches('}').count() as i64;
+    let in_brackets = line.matches('[').count() > line.matches(']').count();
+    let schema = analyze(text);
+
+    // dentro de `TableGroup nome { ... }`: sugere tabelas que ainda não estão no grupo
+    if let Some(members) = group_block(before) {
+        let needle = word.to_ascii_lowercase();
+        return schema
+            .tables
+            .iter()
+            .filter(|t| {
+                !members.contains(&t.name) && t.name.to_ascii_lowercase().starts_with(&needle)
+            })
+            .map(|t| {
+                let mut c = item(
+                    &t.name,
+                    &t.name,
+                    CompletionKind::Table,
+                    &format!("{} colunas", t.columns.len()),
+                );
+                c.replace = offset - word.len()..offset;
+                c
+            })
+            .collect();
+    }
+
+    let refs_target =
+        ctx.trim_end().ends_with(['>', '<', '-']) && (ctx.contains("ref") || ctx.contains("Ref"));
+    let items: Vec<Completion> =
+        if refs_target || (word.contains('.') && ctx.to_ascii_lowercase().contains("ref")) {
+            match word.split_once('.') {
+                Some((t, _)) => schema
+                    .table(t)
+                    .map(|t| {
+                        t.columns
+                            .iter()
+                            .map(|c| {
+                                item(
+                                    &c.name,
+                                    &format!("{}.{}", t.name, c.name),
+                                    CompletionKind::Column,
+                                    &c.ty,
+                                )
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                None => schema
+                    .tables
+                    .iter()
+                    .map(|t| {
+                        item(
+                            &t.name,
+                            &format!("{}.", t.name),
+                            CompletionKind::Table,
+                            "tabela",
+                        )
+                    })
+                    .collect(),
+            }
+        } else if in_brackets {
+            SETTINGS
+                .iter()
+                .map(|(l, i, d)| item(l, i, CompletionKind::Setting, d))
+                .collect()
+        } else if depth > 0 && ctx.split_whitespace().count() == 1 {
+            TYPES
+                .iter()
+                .map(|t| item(t, t, CompletionKind::Type, "tipo"))
+                .collect()
+        } else if depth <= 0 && ctx.trim().is_empty() {
+            vec![
+                item("Table", "Table ", CompletionKind::Keyword, "nova tabela"),
+                item("Ref", "Ref: ", CompletionKind::Keyword, "nova relação"),
+                item("Enum", "Enum ", CompletionKind::Keyword, "enumeração"),
+                item(
+                    "TableGroup",
+                    "TableGroup ",
+                    CompletionKind::Keyword,
+                    "grupo de tabelas",
+                ),
+                item(
+                    "Project",
+                    "Project ",
+                    CompletionKind::Keyword,
+                    "metadados do projeto",
+                ),
+                item("Note", "Note: ", CompletionKind::Keyword, "nota"),
+            ]
+        } else {
+            Vec::new()
+        };
+    let needle = word.rsplit('.').next().unwrap_or(word).to_ascii_lowercase();
+    items
+        .into_iter()
+        .filter(|c| c.label.to_ascii_lowercase().starts_with(&needle))
+        .map(|mut c| {
+            c.replace = offset - word.len()..offset;
+            c
+        })
+        .collect()
+}
+
+/// Se o cursor está dentro de um bloco `TableGroup { ... }`, devolve os membros já
+/// listados (para não sugeri-los de novo).
+fn group_block(before: &str) -> Option<Vec<String>> {
+    let mut open: Vec<usize> = Vec::new();
+    for (i, ch) in before.char_indices() {
+        match ch {
+            '{' => open.push(i),
+            '}' => {
+                open.pop();
+            }
+            _ => {}
+        }
+    }
+    let brace = *open.last()?;
+    let line_start = before[..brace].rfind('\n').map_or(0, |i| i + 1);
+    let header = before[line_start..brace].trim_start().to_ascii_lowercase();
+    if !header.starts_with("tablegroup") {
+        return None;
+    }
+    let body = &before[brace + 1..];
+    let done = body.rfind('\n').map_or("", |i| &body[..i]);
+    Some(
+        done.lines()
+            .map(|l| l.trim().trim_end_matches(',').trim().to_string())
+            .filter(|l| !l.is_empty() && !l.starts_with("//"))
+            .collect(),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const S: &str = "Table users {\n  id int [pk]\n  email text\n}\n";
+
+    fn labels(text: &str) -> Vec<String> {
+        complete(text, text.len())
+            .into_iter()
+            .map(|c| c.label)
+            .collect()
+    }
+
+    #[test]
+    fn keywords_at_top_level() {
+        assert!(labels(&format!("{S}Ta")).contains(&"Table".to_string()));
+    }
+
+    #[test]
+    fn types_after_column_name() {
+        let l = labels("Table t {\n  name var");
+        assert_eq!(l, vec!["varchar(255)".to_string()]);
+    }
+
+    #[test]
+    fn settings_inside_brackets() {
+        let l = labels("Table t {\n  id int [p");
+        assert_eq!(l, vec!["pk".to_string()]);
+    }
+
+    #[test]
+    fn tables_inside_table_group() {
+        let base = "Table orders {\n  id int\n}\nTable order_items {\n  id int\n}\nTable users {\n  id int\n}\n";
+        // já tem order_items; ao digitar `o`, sugere só orders
+        let t = format!("{base}TableGroup vendas [color: #3b82f6] {{\n  order_items,\n  o");
+        assert_eq!(labels(&t), vec!["orders".to_string()]);
+        // linha vazia: todas as que faltam
+        let t = format!("{base}TableGroup vendas {{\n  orders\n  ");
+        assert_eq!(
+            labels(&t),
+            vec!["order_items".to_string(), "users".to_string()]
+        );
+    }
+
+    #[test]
+    fn tables_then_columns_in_refs() {
+        let t = format!("{S}Ref: posts.user_id > us");
+        assert_eq!(labels(&t), vec!["users".to_string()]);
+        let c = format!("{S}Ref: posts.user_id > users.e");
+        assert_eq!(labels(&c), vec!["email".to_string()]);
+        let inline = "Table users {\n  id int [pk]\n}\nTable p {\n  u int [ref: > ";
+        assert!(labels(inline).contains(&"users".to_string()));
+    }
+}
