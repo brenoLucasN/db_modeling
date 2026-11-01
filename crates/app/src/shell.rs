@@ -54,6 +54,45 @@ enum Pane {
     Problems,
 }
 
+const STANDARD_TYPES: &[(&str, &str)] = &[
+    ("int", "inteiro 4B"),
+    ("bigint", "inteiro longo 8B"),
+    ("smallint", "inteiro curto 2B"),
+    ("serial", "autoincremento"),
+    ("varchar(255)", "texto variável"),
+    ("text", "texto longo"),
+    ("boolean", "booleano"),
+    ("uuid", "identificador único"),
+    ("timestamp", "data e hora"),
+    ("timestamptz", "data e hora com fuso"),
+    ("date", "data"),
+    ("time", "hora"),
+    ("decimal(10,2)", "numérico decimal"),
+    ("float", "ponto flutuante"),
+    ("double", "ponto flutuante duplo"),
+    ("json", "JSON"),
+    ("jsonb", "JSON binário"),
+    ("bytea", "binário"),
+];
+
+fn extract_enums_from_dbml(text: &str) -> Vec<String> {
+    let mut enums = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("Enum ") {
+            let name = rest
+                .split(|c: char| c.is_whitespace() || c == '{')
+                .next()
+                .unwrap_or("")
+                .trim();
+            if !name.is_empty() && !enums.contains(&name.to_string()) {
+                enums.push(name.to_string());
+            }
+        }
+    }
+    enums
+}
+
 pub struct Shell {
     /// Pasta do projeto; `None` = arquivos avulsos.
     project: Option<PathBuf>,
@@ -73,6 +112,10 @@ pub struct Shell {
     widths: (f32, f32, f32),
     panels_gen: usize,
     translucent_cards: bool,
+    /// largura da coluna de tipos de dados no inspector
+    col_type_w: f32,
+    /// arraste horizontal para redimensionar a coluna de tipos (x inicial, col_type_w inicial)
+    col_resize_start: Option<(Pixels, f32)>,
     editing: Option<(EditTarget, Entity<InputState>, Subscription)>,
     last_summary: Option<crate::canvas::Summary>,
     palette: Entity<CommandState>,
@@ -178,6 +221,8 @@ impl Shell {
             // DBM_TRANSLUCENT: usado pelo harness de screenshot
             translucent_cards: std::env::var("DBM_TRANSLUCENT").is_ok()
                 || crate::settings::load().translucent_cards,
+            col_type_w: crate::settings::load().col_type_w,
+            col_resize_start: None,
             panels_gen: 0,
             last_summary: None,
             editing: None,
@@ -638,13 +683,35 @@ impl Shell {
         let sub = cx.subscribe_in(
             &state,
             window,
-            |this: &mut Shell, _, ev: &InputEvent, window, cx| {
-                if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+            |this: &mut Shell, _, ev: &InputEvent, window, cx| match ev {
+                InputEvent::Change => {
+                    cx.notify();
+                }
+                InputEvent::PressEnter { .. } | InputEvent::Blur => {
                     this.commit_edit(window, cx);
                 }
+                _ => {}
             },
         );
         self.editing = Some((target, state, sub));
+        cx.notify();
+    }
+
+    /// Aplica um tipo selecionado via autocomplete imediatamente.
+    fn apply_column_type(
+        &mut self,
+        table: String,
+        col: String,
+        ty: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.editing = None;
+        if !ty.is_empty() {
+            self.edit_text(false, window, cx, |t| {
+                dbml_edit::set_column_type(t, &table, &col, &ty)
+            });
+        }
         cx.notify();
     }
 
@@ -804,6 +871,7 @@ impl Shell {
             sidebar_w: self.widths.0,
             editor_w: self.widths.1,
             inspector_w: self.widths.2,
+            col_type_w: self.col_type_w,
             translucent_cards: self.translucent_cards,
         });
     }
@@ -817,6 +885,7 @@ impl Shell {
     fn reset_panels(&mut self, _: &ResetPanels, _: &mut Window, cx: &mut Context<Self>) {
         let d = crate::settings::Settings::default();
         self.widths = (d.sidebar_w, d.editor_w, d.inspector_w);
+        self.col_type_w = d.col_type_w;
         self.panels_gen += 1;
         self.save_prefs();
         cx.notify();
@@ -1850,7 +1919,55 @@ impl Shell {
                     }
                 }
             };
+            let col_type_w = self.col_type_w;
             let mut cols = div().flex().flex_col();
+            let col_header = div()
+                .flex()
+                .items_center()
+                .gap(px(6.))
+                .px(SP_MD)
+                .py(px(4.))
+                .border_b_1()
+                .border_color(g.edge_soft)
+                .text_size(px(10.))
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(g.text_faint)
+                .child(div().flex_1().min_w(px(60.)).child("NOME"))
+                .child(
+                    div()
+                        .id("col-splitter-hdr")
+                        .w(px(8.))
+                        .h(px(14.))
+                        .mx(px(-2.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor(CursorStyle::ResizeLeftRight)
+                        .tooltip(|window, cx| {
+                            Tooltip::new(
+                                "Arrastar para redimensionar colunas (duplo-clique restaura)",
+                            )
+                            .build(window, cx)
+                        })
+                        .hover(|s| s.bg(g.hover).rounded(px(2.)))
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                                if e.click_count >= 2 {
+                                    this.col_type_w = 110.0;
+                                    this.save_prefs();
+                                    cx.notify();
+                                } else {
+                                    this.col_resize_start = Some((e.position.x, this.col_type_w));
+                                }
+                            }),
+                        )
+                        .child(div().w(px(1.5)).h(px(10.)).bg(g.edge)),
+                )
+                .child(div().flex_none().w(px(col_type_w)).child("TIPO"))
+                .child(div().flex_none().w(px(62.)).child("FLAGS"))
+                .child(div().w(px(16.)));
+            cols = cols.child(col_header);
             for c in &t.columns {
                 let chip = |id: String,
                             label: &'static str,
@@ -1904,6 +2021,10 @@ impl Shell {
                     cx,
                 );
                 let (table, col) = (t.name.clone(), c.name.clone());
+                let is_editing_this_type = matches!(
+                    &editing,
+                    Some((EditTarget::ColType(tbl, col), _)) if tbl == &t.name && col == &c.name
+                );
                 cols = cols.child(
                     div()
                         .group("insp-col")
@@ -1918,14 +2039,36 @@ impl Shell {
                         .child(
                             div()
                                 .flex_1()
-                                .min_w(px(64.))
+                                .min_w(px(60.))
                                 .overflow_hidden()
                                 .child(name_el),
                         )
                         .child(
                             div()
+                                .w(px(4.))
+                                .h(px(14.))
+                                .mx(px(-2.))
                                 .flex_none()
-                                .w(px(70.))
+                                .cursor(CursorStyle::ResizeLeftRight)
+                                .hover(|s| s.bg(g.accent.opacity(0.4)).rounded(px(1.)))
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                                        if e.click_count >= 2 {
+                                            this.col_type_w = 110.0;
+                                            this.save_prefs();
+                                            cx.notify();
+                                        } else {
+                                            this.col_resize_start =
+                                                Some((e.position.x, this.col_type_w));
+                                        }
+                                    }),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .flex_none()
+                                .w(px(col_type_w))
                                 .overflow_hidden()
                                 .text_size(TEXT_XS)
                                 .child(type_el),
@@ -1958,20 +2101,142 @@ impl Shell {
                                 ),
                         ),
                 );
+
+                if is_editing_this_type {
+                    let query = if let Some((_, st)) = &editing {
+                        st.read(cx).value().trim().to_ascii_lowercase()
+                    } else {
+                        String::new()
+                    };
+
+                    let doc_text = self
+                        .doc()
+                        .map(|d| d.editor.read(cx).value().to_string())
+                        .unwrap_or_default();
+                    let enums = extract_enums_from_dbml(&doc_text);
+
+                    let mut suggestions: Vec<(&str, &str)> = Vec::new();
+                    for &(ty, desc) in STANDARD_TYPES {
+                        if query.is_empty() || ty.to_ascii_lowercase().contains(&query) {
+                            suggestions.push((ty, desc));
+                        }
+                    }
+                    for en in &enums {
+                        if query.is_empty() || en.to_ascii_lowercase().contains(&query) {
+                            suggestions.push((en.as_str(), "enumeração"));
+                        }
+                    }
+                    suggestions.truncate(8);
+
+                    if !suggestions.is_empty() {
+                        let mut sugg_box = div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(2.))
+                            .p(px(6.))
+                            .mx(SP_MD)
+                            .my(px(2.))
+                            .rounded(px(6.))
+                            .bg(g.island)
+                            .border_1()
+                            .border_color(g.edge)
+                            .shadow_md();
+
+                        sugg_box = sugg_box.child(
+                            div()
+                                .flex()
+                                .justify_between()
+                                .px(px(4.))
+                                .pb(px(2.))
+                                .border_b_1()
+                                .border_color(g.edge_soft)
+                                .text_size(px(10.))
+                                .text_color(g.text_faint)
+                                .child("Sugestões de tipo (clique para aplicar)")
+                                .child("Esc fecha"),
+                        );
+
+                        for (s_type, s_desc) in suggestions {
+                            let opt_type = s_type.to_string();
+                            let (tbl, cl) = (t.name.clone(), c.name.clone());
+                            sugg_box = sugg_box.child(
+                                div()
+                                    .id(SharedString::from(format!(
+                                        "type-opt-{}-{}-{}",
+                                        tbl, cl, opt_type
+                                    )))
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
+                                    .px(px(6.))
+                                    .py(px(3.))
+                                    .rounded(px(4.))
+                                    .cursor_pointer()
+                                    .hover(|s| s.bg(g.hover))
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |this, _, window, cx| {
+                                            this.apply_column_type(
+                                                tbl.clone(),
+                                                cl.clone(),
+                                                opt_type.clone(),
+                                                window,
+                                                cx,
+                                            );
+                                        }),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_size(TEXT_XS)
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_color(g.text)
+                                            .child(s_type.to_string()),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_size(px(10.))
+                                            .text_color(g.text_faint)
+                                            .child(s_desc.to_string()),
+                                    ),
+                            );
+                        }
+                        cols = cols.child(sugg_box);
+                    }
+                }
             }
             let add_table = t.name.clone();
-            cols = cols.child(
-                div().px(SP_MD).py(SP_SM).child(
-                    Button::new("insp-add-col")
-                        .ghost()
-                        .small()
-                        .icon(IconName::Plus)
-                        .label("Adicionar coluna")
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.add_column_to(add_table.clone(), window, cx)
-                        })),
-                ),
-            );
+            cols = cols
+                .child(
+                    div().px(SP_MD).py(SP_SM).child(
+                        Button::new("insp-add-col")
+                            .ghost()
+                            .small()
+                            .icon(IconName::Plus)
+                            .label("Adicionar coluna")
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.add_column_to(add_table.clone(), window, cx)
+                            })),
+                    ),
+                )
+                .on_mouse_move(cx.listener(|this, e: &MouseMoveEvent, _, cx| {
+                    if let Some((start_x, start_w)) = this.col_resize_start {
+                        let delta = f32::from(e.position.x - start_x);
+                        let new_w = (start_w - delta).clamp(60.0, 360.0);
+                        if (new_w - this.col_type_w).abs() >= 0.5 {
+                            this.col_type_w = new_w;
+                            cx.notify();
+                        }
+                    }
+                }))
+                .on_mouse_up(
+                    MouseButton::Left,
+                    cx.listener(|this, _, _, cx| {
+                        if this.col_resize_start.take().is_some() {
+                            this.save_prefs();
+                            cx.notify();
+                        }
+                    }),
+                );
             let title_el = field(EditTarget::Table(t.name.clone()), t.name.clone(), false, cx);
             let mut rels = div().flex().flex_col().gap(px(4.)).px(SP_MD);
             for r in refs {
@@ -2474,7 +2739,7 @@ impl Render for Shell {
                 resizable_panel()
                     .visible(show_inspector)
                     .size(px(self.widths.2))
-                    .size_range(px(240.)..px(520.))
+                    .size_range(px(240.)..px(800.))
                     .child(inspector),
             )
             .into_any_element(),

@@ -10,6 +10,7 @@ pub struct Settings {
     pub sidebar_w: f32,
     pub editor_w: f32,
     pub inspector_w: f32,
+    pub col_type_w: f32,
     pub translucent_cards: bool,
 }
 
@@ -20,6 +21,7 @@ impl Default for Settings {
             sidebar_w: f32::from(SIDEBAR_W),
             editor_w: f32::from(EDITOR_W),
             inspector_w: f32::from(INSPECTOR_W),
+            col_type_w: 110.0,
             translucent_cards: false,
         }
     }
@@ -55,6 +57,14 @@ pub fn load() -> Settings {
             Some(("sidebar_w", v)) => s.sidebar_w = width(v, d.sidebar_w),
             Some(("editor_w", v)) => s.editor_w = width(v, d.editor_w),
             Some(("inspector_w", v)) => s.inspector_w = width(v, d.inspector_w),
+            Some(("col_type_w", v)) => {
+                s.col_type_w = v
+                    .trim()
+                    .parse::<f32>()
+                    .ok()
+                    .filter(|w| (60.0..=400.0).contains(w))
+                    .unwrap_or(d.col_type_w)
+            }
             Some(("translucent_cards", v)) => s.translucent_cards = v.trim() == "true",
             _ => {}
         }
@@ -75,10 +85,11 @@ pub fn save(s: &Settings) {
     let _ = std::fs::write(
         p,
         format!(
-            "mode={mode}\nsidebar_w={}\neditor_w={}\ninspector_w={}\ntranslucent_cards={}\n",
+            "mode={mode}\nsidebar_w={}\neditor_w={}\ninspector_w={}\ncol_type_w={}\ntranslucent_cards={}\n",
             s.sidebar_w.round(),
             s.editor_w.round(),
             s.inspector_w.round(),
+            s.col_type_w.round(),
             s.translucent_cards
         ),
     );
