@@ -1,5 +1,6 @@
 # Cargo (cobre também tools/*/target)
 target/
+dist/
 
 # Claude Code (agentes, skills, comandos e configurações)
 .claude/
@@ -16,3 +17,5 @@ Thumbs.db
 *.pending-snap
 /screenshots/
 *.profraw
+openspec/
+.scratch/

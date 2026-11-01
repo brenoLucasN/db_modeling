@@ -45,6 +45,19 @@ impl AssetSource for AppAssets {
 }
 
 fn main() {
+    if std::env::args().any(|a| a == "--version" || a == "-V" || a == "-v") {
+        println!("db-modeling {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    if std::env::args().any(|a| a == "--help" || a == "-h") {
+        println!("DB Modeling {}", env!("CARGO_PKG_VERSION"));
+        println!("Modelagem de banco de dados no canvas ou no texto com DBML\n");
+        println!("Uso: db-modeling [ARQUIVO.dbml | PASTA]\n");
+        println!("Opções:");
+        println!("  -v, -V, --version   Exibe a versão do aplicativo");
+        println!("  -h, --help          Exibe esta ajuda");
+        return;
+    }
     gpui_kit::application().with_assets(AppAssets).run(|cx| {
         gpui_kit::init(cx);
         cx.text_system()

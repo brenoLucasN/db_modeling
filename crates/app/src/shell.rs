@@ -17,7 +17,7 @@ use gpui_kit::component::menu::DropdownMenu;
 use gpui_kit::component::resizable::{h_resizable, resizable_panel};
 use gpui_kit::component::theme::{Theme, ThemeMode};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{Icon, Sizable, WindowExt};
+use gpui_kit::component::{Icon, InteractiveElementExt as _, Sizable, WindowExt};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use std::path::{Path, PathBuf};
@@ -78,6 +78,7 @@ pub struct Shell {
     palette: Entity<CommandState>,
     focus: FocusHandle,
     _subs: Vec<Subscription>,
+    dragging_window: bool,
 }
 
 impl Focusable for Shell {
@@ -183,6 +184,7 @@ impl Shell {
             palette: cx.new(|cx| CommandState::new(window, cx)),
             focus: cx.focus_handle(),
             _subs: Vec::new(),
+            dragging_window: false,
         };
         // DBM_PANE: painel inicial (usado pelo harness de screenshot)
         this.pane = match std::env::var("DBM_PANE").as_deref() {
@@ -1022,7 +1024,34 @@ impl Shell {
                     .id("titlebar-drag")
                     .window_control_area(WindowControlArea::Drag)
                     .flex_1()
-                    .h_full(),
+                    .h_full()
+                    .when(cfg!(not(windows)), |d| {
+                        d.on_double_click(|_, window, _| window.zoom_window())
+                            .on_mouse_down_out(cx.listener(|this, _, _, _| {
+                                this.dragging_window = false;
+                            }))
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _, _| {
+                                    this.dragging_window = true;
+                                }),
+                            )
+                            .on_mouse_down(MouseButton::Right, |ev, window, _| {
+                                window.show_window_menu(ev.position);
+                            })
+                            .on_mouse_up(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _, _| {
+                                    this.dragging_window = false;
+                                }),
+                            )
+                            .on_mouse_move(cx.listener(|this, _, window, _| {
+                                if this.dragging_window {
+                                    this.dragging_window = false;
+                                    window.start_window_move();
+                                }
+                            }))
+                    }),
             )
             .child(
                 div()
@@ -1124,8 +1153,104 @@ impl Shell {
         }
         #[cfg(not(windows))]
         {
-            let _ = maximized;
-            bar = bar.pr(SP_SM);
+            let (max_label, max_icon) = if maximized {
+                ("Restaurar", IconName::WindowRestore)
+            } else {
+                ("Maximizar", IconName::WindowMaximize)
+            };
+
+            bar = bar.child(
+                div()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .child(
+                        div()
+                            .id("cap-min")
+                            .role(Role::Button)
+                            .aria_label("Minimizar")
+                            .occlude()
+                            .w(px(38.))
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(g.text_muted)
+                            .hover({
+                                let h = g.hover;
+                                let ink = g.text;
+                                move |s| s.bg(h).text_color(ink)
+                            })
+                            .active({
+                                let h = g.hover;
+                                move |s| s.bg(h.opacity(0.8))
+                            })
+                            .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                window.prevent_default();
+                                cx.stop_propagation();
+                            })
+                            .on_click(|_, window, cx| {
+                                cx.stop_propagation();
+                                window.minimize_window();
+                            })
+                            .child(Icon::new(IconName::WindowMinimize).small()),
+                    )
+                    .child(
+                        div()
+                            .id("cap-max")
+                            .role(Role::Button)
+                            .aria_label(max_label)
+                            .occlude()
+                            .w(px(38.))
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(g.text_muted)
+                            .hover({
+                                let h = g.hover;
+                                let ink = g.text;
+                                move |s| s.bg(h).text_color(ink)
+                            })
+                            .active({
+                                let h = g.hover;
+                                move |s| s.bg(h.opacity(0.8))
+                            })
+                            .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                window.prevent_default();
+                                cx.stop_propagation();
+                            })
+                            .on_click(|_, window, cx| {
+                                cx.stop_propagation();
+                                window.zoom_window();
+                            })
+                            .child(Icon::new(max_icon).small()),
+                    )
+                    .child(
+                        div()
+                            .id("cap-close")
+                            .role(Role::Button)
+                            .aria_label("Fechar")
+                            .occlude()
+                            .w(px(38.))
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(g.text_muted)
+                            .hover(move |s| s.bg(CAPTION_CLOSE).text_color(gpui_kit::white()))
+                            .active(move |s| s.bg(CAPTION_CLOSE.opacity(0.8)))
+                            .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                window.prevent_default();
+                                cx.stop_propagation();
+                            })
+                            .on_click(|_, _, cx| {
+                                cx.stop_propagation();
+                                cx.quit();
+                            })
+                            .child(Icon::new(IconName::WindowClose).small()),
+                    ),
+            );
         }
         bar
     }
@@ -2205,11 +2330,13 @@ impl Shell {
         } else {
             bar = bar.child(div().flex_1());
         }
-        bar.child("DBML").child(if self.mode == Mode::Dark {
-            "Escuro"
-        } else {
-            "Claro"
-        })
+        bar.child(format!("v{}", env!("CARGO_PKG_VERSION")))
+            .child("DBML")
+            .child(if self.mode == Mode::Dark {
+                "Escuro"
+            } else {
+                "Claro"
+            })
     }
 }
 
