@@ -43,6 +43,7 @@ pub enum DiagramEvent {
     },
     AddColumn(String),
     Rename(String),
+    Select(String),
 }
 
 impl EventEmitter<DiagramEvent> for Diagram {}
@@ -920,24 +921,30 @@ impl Diagram {
                                 .w(s(14.))
                                 .flex()
                                 .justify_center()
-                                .children(icon.map(|i| i.size(s(12.)))),
+                                .children(icon.map(|i| i.size(s(12. * g.ui_scale)))),
                         )
                         .child(
                             div()
                                 .flex_1()
                                 .truncate()
+                                .text_size(s(13. * g.ui_scale))
                                 .text_color(g.text)
                                 .when(c.pk, |d| d.font_weight(FontWeight::MEDIUM))
                                 .child(c.name.clone()),
                         )
                         .child(
                             div()
-                                .text_size(s(11.5))
+                                .text_size(s(11.5 * g.ui_scale))
                                 .text_color(g.text_muted)
                                 .child(c.ty.clone()),
                         )
                         .when(c.not_null, |d| {
-                            d.child(div().text_size(s(10.)).text_color(g.text_muted).child("NN"))
+                            d.child(
+                                div()
+                                    .text_size(s(10. * g.ui_scale))
+                                    .text_color(g.text_muted)
+                                    .child("NN"),
+                            )
                         })
                         // porta: arraste até outra coluna para criar a relação
                         .child(
@@ -1043,6 +1050,7 @@ impl Diagram {
                                 this.selected = Some(name.clone());
                                 this.multi.clear();
                             }
+                            cx.emit(DiagramEvent::Select(name.clone()));
                             let _ = grab;
                             this.drag = Some(Drag::Cards {
                                 last: this.to_world(e.position),
@@ -1083,14 +1091,14 @@ impl Diagram {
                                     .justify_center()
                                     .child(
                                         Icon::new(IconName::Table2)
-                                            .size(s(13.))
+                                            .size(s(13. * g.ui_scale))
                                             .text_color(tint.unwrap_or(g.accent)),
                                     ),
                             )
                             .child(
                                 div()
                                     .flex_1()
-                                    .text_size(s(14.))
+                                    .text_size(s(14. * g.ui_scale))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(g.text)
                                     .child(t.name.clone()),
@@ -1101,7 +1109,7 @@ impl Diagram {
                                     .rounded(s(5.))
                                     .border_1()
                                     .border_color(g.edge)
-                                    .text_size(s(10.5))
+                                    .text_size(s(10.5 * g.ui_scale))
                                     .text_color(g.text_muted)
                                     .child(t.columns.len().to_string()),
                             ),
@@ -1231,6 +1239,7 @@ impl Diagram {
                 .justify_center()
                 .child(
                     island("canvas-tools", "Ferramentas")
+                        .occlude()
                         .child(tool(
                             "tool-select",
                             IconName::MousePointer2,
@@ -1289,6 +1298,7 @@ impl Diagram {
                 .left(px(12.))
                 .child(
                     island("canvas-zoom", "Zoom")
+                        .occlude()
                         .child(tool(
                             "zoom-out",
                             IconName::ZoomOut,
@@ -1327,7 +1337,7 @@ impl Diagram {
                 .absolute()
                 .bottom(px(12.))
                 .right(px(12.))
-                .child(island("canvas-help", "Legenda").child(tool(
+                .child(island("canvas-help", "Legenda").occlude().child(tool(
                     "help-legend",
                     IconName::Info,
                     "Legenda",
@@ -1407,9 +1417,10 @@ impl Diagram {
             out.push(
                 div()
                     .absolute()
-                    .bottom(px(60.))
+                    .bottom(px(52.))
                     .right(px(12.))
-                    .child(legend)
+                    .max_w(px(280.))
+                    .child(legend.occlude())
                     .into_any_element(),
             );
         }

@@ -40,6 +40,10 @@ actions!(
         FormatDocument,
         MoveLineUp,
         MoveLineDown,
+        ZoomInUi,
+        ZoomOutUi,
+        ResetUiZoom,
+        ToggleAutoCollapseInspector,
     ]
 );
 
@@ -168,6 +172,30 @@ pub fn catalog() -> Vec<Entry> {
             ToggleCardTransparency,
             "Aparência",
             "Cartões translúcidos",
+        ),
+        e(
+            "ctrl-shift-=",
+            ZoomInUi,
+            "Aparência",
+            "Aumentar tamanho da interface (fontes e ícones)",
+        ),
+        e(
+            "ctrl-shift--",
+            ZoomOutUi,
+            "Aparência",
+            "Diminuir tamanho da interface (fontes e ícones)",
+        ),
+        e(
+            "ctrl-shift-0",
+            ResetUiZoom,
+            "Aparência",
+            "Tamanho padrão da interface",
+        ),
+        e(
+            "ctrl-shift-i",
+            ToggleAutoCollapseInspector,
+            "Exibir",
+            "Recolher inspector quando nada selecionado",
         ),
         e(
             "alt-shift-f",

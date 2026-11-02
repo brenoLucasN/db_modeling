@@ -94,7 +94,7 @@ fn main() {
                     _ => Mode::Dark,
                 }),
             };
-            shell::apply_theme(mode, cx);
+            shell::apply_theme_scaled(mode, prefs.ui_scale, cx);
             // `app arquivo.dbml` abre o arquivo; `app pasta/` abre o projeto; sem argumento, o exemplo
             let start = std::env::args().nth(1).map(PathBuf::from);
             let shell = cx.new(|cx| shell::Shell::new(start, mode, translucent, window, cx));
