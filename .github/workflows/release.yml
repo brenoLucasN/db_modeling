@@ -106,8 +106,9 @@ jobs:
           VERSION="$(cargo pkgid -p app | cut -d# -f2 | cut -d: -f2 2>/dev/null || sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
           # Compila o assistente de instalação profissional com o ISCC
           "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" //DAppVersion="${VERSION}" scripts/windows/installer.iss
-          # Cria alias versionado do assistente
+          # Cria alias versionado e alias canônico do assistente (usado pelo site)
           cp dist/db-modeling-windows-setup.exe "dist/db-modeling-v${VERSION}-windows-setup.exe"
+          cp dist/db-modeling-windows-setup.exe "dist/db-modeling-windows-x86_64.exe"
 
       - name: Upload dos artefatos Windows
         uses: actions/upload-artifact@v4
