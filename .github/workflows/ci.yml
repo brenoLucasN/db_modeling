@@ -26,11 +26,16 @@ jobs:
           sudo apt-get install -y \
             pkg-config \
             libfontconfig1-dev \
+            libfreetype6-dev \
             libasound2-dev \
             libxkbcommon-dev \
+            libxkbcommon-x11-dev \
             libvulkan-dev \
             libwayland-dev \
-            libx11-xcb-dev
+            libx11-xcb-dev \
+            libxcb1-dev \
+            libxcb-xkb-dev \
+            libssl-dev
 
       - name: Instalar Toolchain Rust
         uses: dtolnay/rust-toolchain@stable

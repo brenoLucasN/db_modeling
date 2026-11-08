@@ -32,11 +32,16 @@ jobs:
           sudo apt-get install -y \
             pkg-config \
             libfontconfig1-dev \
+            libfreetype6-dev \
             libasound2-dev \
             libxkbcommon-dev \
+            libxkbcommon-x11-dev \
             libvulkan-dev \
             libwayland-dev \
             libx11-xcb-dev \
+            libxcb1-dev \
+            libxcb-xkb-dev \
+            libssl-dev \
             rpm
 
       - name: Instalar Toolchain Rust
@@ -53,12 +58,14 @@ jobs:
       - name: Gerar pacote Fedora / RHEL (.rpm)
         run: ./scripts/build-fedora.sh
 
-      - name: Criar aliases com nomes canônicos
+      - name: Criar aliases com nomes canônicos e anexar script universal
         run: |
           cd dist
           # Cria links canônicos para download direto sem versão no nome
           cp $(ls db-modeling_*_amd64.deb | head -n 1) db-modeling-linux-amd64.deb
           cp $(ls db-modeling-*-1.*.rpm | head -n 1) db-modeling-linux-x86_64.rpm
+          # Anexa o assistente de instalação universal para terminal (curl | bash)
+          cp ../scripts/install.sh db-modeling-install.sh
 
       - name: Upload dos artefatos Linux
         uses: actions/upload-artifact@v4
@@ -91,13 +98,16 @@ jobs:
       - name: Compilar executável release
         run: cargo build --release -p app
 
-      - name: Preparar artefatos Windows
+      - name: Compilar Instalador Oficial com Wizard (Inno Setup)
         shell: bash
         run: |
+          choco install innosetup --no-progress -y
           mkdir -p dist
           VERSION="$(cargo pkgid -p app | cut -d# -f2 | cut -d: -f2 2>/dev/null || sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
-          cp target/release/app.exe "dist/db-modeling-v${VERSION}-x86_64.exe"
-          cp target/release/app.exe "dist/db-modeling-windows-x86_64.exe"
+          # Compila o assistente de instalação profissional com o ISCC
+          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" //DAppVersion="${VERSION}" scripts/windows/installer.iss
+          # Cria alias versionado do assistente
+          cp dist/db-modeling-windows-setup.exe "dist/db-modeling-v${VERSION}-windows-setup.exe"
 
       - name: Upload dos artefatos Windows
         uses: actions/upload-artifact@v4
@@ -139,7 +149,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-macos
-          path: dist/*.dmg
+          path: |
+            dist/*.pkg
+            dist/*.dmg
           retention-days: 1
 
   # ============================================================
