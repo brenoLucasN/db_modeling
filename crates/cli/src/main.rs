@@ -34,13 +34,44 @@ async fn main() -> anyhow::Result<()> {
 
     let url = format!("http://{}:{}/", config.host, port);
 
-    println!("\n{}", "==========================================================".blue().bold());
-    println!("{}", "        DB Modeling - Servidor Web & Canvas Local         ".blue().bold());
-    println!("{}\n", "==========================================================".blue().bold());
-    println!("  {} {}", "Arquivo: ".bold(), state.file_path.display().to_string().cyan());
-    println!("  {} {}", "Sidecar: ".bold(), state.layout_path.display().to_string().cyan());
-    println!("  {} {}", "Servidor:".bold(), url.green().bold().underline());
-    println!("\n  {} Pressione {} para encerrar o servidor.\n", "Dica:".yellow(), "Ctrl+C".bold());
+    println!(
+        "\n{}",
+        "=========================================================="
+            .blue()
+            .bold()
+    );
+    println!(
+        "{}",
+        "        DB Modeling - Servidor Web & Canvas Local         "
+            .blue()
+            .bold()
+    );
+    println!(
+        "{}\n",
+        "=========================================================="
+            .blue()
+            .bold()
+    );
+    println!(
+        "  {} {}",
+        "Arquivo: ".bold(),
+        state.file_path.display().to_string().cyan()
+    );
+    println!(
+        "  {} {}",
+        "Sidecar: ".bold(),
+        state.layout_path.display().to_string().cyan()
+    );
+    println!(
+        "  {} {}",
+        "Servidor:".bold(),
+        url.green().bold().underline()
+    );
+    println!(
+        "\n  {} Pressione {} para encerrar o servidor.\n",
+        "Dica:".yellow(),
+        "Ctrl+C".bold()
+    );
 
     // Abre o navegador padrão automaticamente
     if !config.no_open {
@@ -57,7 +88,10 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app)
         .with_graceful_shutdown(async {
             let _ = tokio::signal::ctrl_c().await;
-            println!("\n{}", "Encerrando o servidor DB Modeling com segurança...".yellow());
+            println!(
+                "\n{}",
+                "Encerrando o servidor DB Modeling com segurança...".yellow()
+            );
         })
         .await?;
 

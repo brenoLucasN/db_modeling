@@ -143,10 +143,12 @@ pub fn delete_table(text: &str, name: &str) -> String {
         edits.push((r, String::new()));
     }
     for r in root.children().filter(|n| n.kind() == SyntaxKind::Ref) {
-        if let Some((ft, fc, tt, _)) = parse_top_ref_endpoints(&r) {
-            if tt == name && ft != name && fc.starts_with(&format!("id_{name}")) {
-                fk_cols_to_remove.push((ft.clone(), fc.clone()));
-            }
+        if let Some((ft, fc, tt, _)) = parse_top_ref_endpoints(&r)
+            && tt == name
+            && ft != name
+            && fc.starts_with(&format!("id_{name}"))
+        {
+            fk_cols_to_remove.push((ft.clone(), fc.clone()));
         }
         let toks = sig(&r);
         if toks
@@ -399,8 +401,8 @@ pub fn link_tables(text: &str, source_table: &str, target_table: &str) -> String
     if find_table(&root, source_table).is_none() || find_table(&root, target_table).is_none() {
         return text.to_string();
     }
-    let (pk_col, pk_ty) =
-        primary_key_of(&root, source_table).unwrap_or_else(|| ("id".to_string(), "int".to_string()));
+    let (pk_col, pk_ty) = primary_key_of(&root, source_table)
+        .unwrap_or_else(|| ("id".to_string(), "int".to_string()));
 
     // Idempotência: se já existe Ref entre target_table e source_table.<pk_col>, não duplica
     for r in root.children().filter(|n| n.kind() == SyntaxKind::Ref) {

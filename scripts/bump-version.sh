@@ -25,8 +25,10 @@ echo "==> Atualizando versão no Cargo.toml raiz para $NEW_VERSION..."
 sed -i.bak -E "s/^(version = \")[^\"]+(\")/\1$NEW_VERSION\2/" Cargo.toml
 rm -f Cargo.toml.bak
 
-echo "==> Validando integridade com cargo check..."
-cargo check --workspace
+echo "==> Formatando código e validando integridade (fmt + clippy + test)..."
+cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 
 echo ""
 echo "=========================================================="

@@ -7,7 +7,9 @@ async fn test_state_creation_and_atomic_write() {
     let _ = tokio::fs::remove_file(&test_file).await;
 
     // Criação do estado e do arquivo inicial
-    let state = dbml_cli::state::AppState::new(test_file.clone()).await.unwrap();
+    let state = dbml_cli::state::AppState::new(test_file.clone())
+        .await
+        .unwrap();
 
     let initial = state.content.read().await.clone();
     assert!(initial.contains("Table users"));
@@ -37,6 +39,12 @@ async fn test_hash_calculation_and_suppression() {
     let text2 = "Table users { id int }";
     let text3 = "Table users { id bigint }";
 
-    assert_eq!(dbml_cli::state::compute_hash(text1), dbml_cli::state::compute_hash(text2));
-    assert_ne!(dbml_cli::state::compute_hash(text1), dbml_cli::state::compute_hash(text3));
+    assert_eq!(
+        dbml_cli::state::compute_hash(text1),
+        dbml_cli::state::compute_hash(text2)
+    );
+    assert_ne!(
+        dbml_cli::state::compute_hash(text1),
+        dbml_cli::state::compute_hash(text3)
+    );
 }

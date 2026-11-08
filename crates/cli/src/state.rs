@@ -19,7 +19,12 @@ pub async fn atomic_write(path: &Path, content: &str) -> anyhow::Result<()> {
 
     tokio::fs::write(&tmp_path, content)
         .await
-        .with_context(|| format!("Falha ao gravar arquivo temporário '{}'", tmp_path.display()))?;
+        .with_context(|| {
+            format!(
+                "Falha ao gravar arquivo temporário '{}'",
+                tmp_path.display()
+            )
+        })?;
 
     tokio::fs::rename(&tmp_path, path)
         .await

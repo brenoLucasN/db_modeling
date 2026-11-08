@@ -2724,9 +2724,14 @@ impl Shell {
                                 .icon(IconName::Trash)
                                 .tooltip("Excluir relação e coluna FK")
                                 .on_click(cx.listener(move |this, _, window, cx| {
-                                    let (f, t) = ((ft.clone(), fc.clone()), (tt.clone(), tc.clone()));
+                                    let (f, t) =
+                                        ((ft.clone(), fc.clone()), (tt.clone(), tc.clone()));
                                     this.edit_text(false, window, cx, |text| {
-                                        Some(dbml_edit::delete_ref(text, (&f.0, &f.1), (&t.0, &t.1)))
+                                        Some(dbml_edit::delete_ref(
+                                            text,
+                                            (&f.0, &f.1),
+                                            (&t.0, &t.1),
+                                        ))
                                     });
                                 })),
                         ),
