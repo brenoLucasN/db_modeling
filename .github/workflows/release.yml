@@ -117,11 +117,11 @@ jobs:
           retention-days: 1
 
   # ============================================================
-  # 3. BUILD MACOS (.dmg Apple Silicon)
+  # 3. BUILD MACOS (.dmg e .pkg Apple Silicon)
   # ============================================================
   build-macos:
-    name: Build macOS (.dmg)
-    runs-on: macos-14
+    name: Build macOS (.dmg e .pkg)
+    runs-on: macos-latest
 
     steps:
       - name: Checkout do repositório
@@ -137,13 +137,14 @@ jobs:
         with:
           shared-key: "release-macos"
 
-      - name: Gerar imagem montável .dmg
+      - name: Gerar instaladores .pkg e .dmg
         run: ./scripts/build-macos.sh arm64
 
       - name: Criar aliases com nomes canônicos
         run: |
           cd dist
           cp $(ls db-modeling-*-arm64.dmg | head -n 1) db-modeling-macos-arm64.dmg
+          cp $(ls db-modeling-*-arm64.pkg | head -n 1) db-modeling-macos-setup.pkg
 
       - name: Upload dos artefatos macOS
         uses: actions/upload-artifact@v4
