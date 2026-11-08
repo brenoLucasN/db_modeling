@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, develop, dev ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, develop, dev ]
 
 # Cancela execuções concorrentes do mesmo PR se novos commits forem enviados
 concurrency:
@@ -20,10 +20,12 @@ jobs:
       - name: Checkout do repositório
         uses: actions/checkout@v4
 
-      - name: Instalar dependências nativas (GPUI / Wayland / Vulkan / X11)
+      - name: Instalar dependências nativas (GPUI / Wayland / Vulkan / X11 / Fontconfig)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            pkg-config \
+            libfontconfig1-dev \
             libasound2-dev \
             libxkbcommon-dev \
             libvulkan-dev \
