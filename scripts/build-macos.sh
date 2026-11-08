@@ -197,6 +197,31 @@ if [ -f "$ICNS_OUT" ]; then
     chmod 0644 "$ICNS_OUT"
 fi
 
+# Adiciona script de desinstalação limpa dentro do pacote
+cat <<'UNINST' > "$APP_DIR/Contents/Resources/uninstall.sh"
+#!/bin/bash
+# Desinstalador limpo do DB Modeling para macOS
+echo "==> Desinstalando DB Modeling..."
+rm -rf "/Applications/DB Modeling.app"
+echo "==> DB Modeling desinstalado com sucesso do sistema."
+UNINST
+chmod 0755 "$APP_DIR/Contents/Resources/uninstall.sh"
+
+# ============================================================
+# Geração do Assistente de Instalação Apple Package (.pkg)
+# ============================================================
+PKG_OUT="$DISTDIR/${NAME}-v${VERSION}-${ARCH_NAME}.pkg"
+if command -v pkgbuild &>/dev/null; then
+    echo "==> Compilando Assistente de Instalação Apple Package (.pkg)..."
+    pkgbuild --identifier "com.dbmodeling.app" \
+             --version "${VERSION}" \
+             --install-location "/Applications" \
+             --component "$APP_DIR" \
+             "$PKG_OUT"
+    cp -f "$PKG_OUT" "$DISTDIR/${NAME}-macos-setup.pkg"
+    echo " Assistente PKG gerado: $PKG_OUT"
+fi
+
 # Prepara diretório de staging do DMG
 echo "==> Montando diretório de distribuição da imagem DMG..."
 mkdir -p "$DMG_STAGE"
