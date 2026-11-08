@@ -17,7 +17,7 @@ use gpui_kit::component::menu::DropdownMenu;
 use gpui_kit::component::resizable::{h_resizable, resizable_panel};
 use gpui_kit::component::theme::{Theme, ThemeMode};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{Icon, Sizable, WindowExt};
+use gpui_kit::component::{Icon, InteractiveElementExt as _, Sizable, WindowExt};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use std::path::{Path, PathBuf};
@@ -54,6 +54,45 @@ enum Pane {
     Problems,
 }
 
+const STANDARD_TYPES: &[(&str, &str)] = &[
+    ("int", "inteiro 4B"),
+    ("bigint", "inteiro longo 8B"),
+    ("smallint", "inteiro curto 2B"),
+    ("serial", "autoincremento"),
+    ("varchar(255)", "texto variável"),
+    ("text", "texto longo"),
+    ("boolean", "booleano"),
+    ("uuid", "identificador único"),
+    ("timestamp", "data e hora"),
+    ("timestamptz", "data e hora com fuso"),
+    ("date", "data"),
+    ("time", "hora"),
+    ("decimal(10,2)", "numérico decimal"),
+    ("float", "ponto flutuante"),
+    ("double", "ponto flutuante duplo"),
+    ("json", "JSON"),
+    ("jsonb", "JSON binário"),
+    ("bytea", "binário"),
+];
+
+fn extract_enums_from_dbml(text: &str) -> Vec<String> {
+    let mut enums = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("Enum ") {
+            let name = rest
+                .split(|c: char| c.is_whitespace() || c == '{')
+                .next()
+                .unwrap_or("")
+                .trim();
+            if !name.is_empty() && !enums.contains(&name.to_string()) {
+                enums.push(name.to_string());
+            }
+        }
+    }
+    enums
+}
+
 pub struct Shell {
     /// Pasta do projeto; `None` = arquivos avulsos.
     project: Option<PathBuf>,
@@ -73,11 +112,18 @@ pub struct Shell {
     widths: (f32, f32, f32),
     panels_gen: usize,
     translucent_cards: bool,
+    /// largura da coluna de tipos de dados no inspector
+    col_type_w: f32,
+    /// arraste horizontal para redimensionar a coluna de tipos (x inicial, col_type_w inicial)
+    col_resize_start: Option<(Pixels, f32)>,
     editing: Option<(EditTarget, Entity<InputState>, Subscription)>,
     last_summary: Option<crate::canvas::Summary>,
     palette: Entity<CommandState>,
     focus: FocusHandle,
     _subs: Vec<Subscription>,
+    dragging_window: bool,
+    ui_scale: f32,
+    inspector_auto_hide: bool,
 }
 
 impl Focusable for Shell {
@@ -87,7 +133,13 @@ impl Focusable for Shell {
 }
 
 /// Aplica claro/escuro ao `gpui-component` e a identidade do app (fonte, acento, raios).
+#[allow(dead_code)]
 pub fn apply_theme(mode: Mode, cx: &mut App) {
+    apply_theme_scaled(mode, 1.0, cx);
+}
+
+/// Aplica tema considerando a escala de UI configurada.
+pub fn apply_theme_scaled(mode: Mode, scale: f32, cx: &mut App) {
     Theme::change(
         match mode {
             Mode::Dark => ThemeMode::Dark,
@@ -96,12 +148,12 @@ pub fn apply_theme(mode: Mode, cx: &mut App) {
         None,
         cx,
     );
-    let g = Glass::of(mode, false);
+    let g = Glass::of_scaled(mode, false, scale);
     Theme::update(cx, |t| {
         t.font_family = FONT.into();
-        t.font_size = px(13.);
-        t.radius = px(6.);
-        t.radius_lg = px(10.);
+        t.font_size = px((13.5 * scale).round());
+        t.radius = px((6. * scale).round());
+        t.radius_lg = px((10. * scale).round());
         // popovers, menus e tooltips: camada elevada com sombra (como no Zed)
         t.shadow = true;
         // acento em todo lugar que o componente usa "primário" (o botão tem campos próprios)
@@ -165,9 +217,11 @@ impl Shell {
             active: 0,
             untitled: 0,
             pane: Pane::Schema,
-            sidebar_open: true,
+            sidebar_open: std::env::var("DBM_SIDEBAR").is_ok()
+                || crate::settings::load().sidebar_open,
             editor_open: std::env::var("DBM_EDITOR").is_ok(),
-            inspector_open: true,
+            inspector_open: std::env::var("DBM_INSPECTOR").is_ok()
+                || crate::settings::load().inspector_open,
             mode,
             translucent,
             widths: {
@@ -177,12 +231,17 @@ impl Shell {
             // DBM_TRANSLUCENT: usado pelo harness de screenshot
             translucent_cards: std::env::var("DBM_TRANSLUCENT").is_ok()
                 || crate::settings::load().translucent_cards,
+            col_type_w: crate::settings::load().col_type_w,
+            col_resize_start: None,
             panels_gen: 0,
             last_summary: None,
             editing: None,
             palette: cx.new(|cx| CommandState::new(window, cx)),
             focus: cx.focus_handle(),
             _subs: Vec::new(),
+            dragging_window: false,
+            ui_scale: crate::settings::load().ui_scale,
+            inspector_auto_hide: crate::settings::load().inspector_auto_hide,
         };
         // DBM_PANE: painel inicial (usado pelo harness de screenshot)
         this.pane = match std::env::var("DBM_PANE").as_deref() {
@@ -253,6 +312,15 @@ impl Shell {
         let obs = cx.observe(&diagram, |this: &mut Shell, d, cx| {
             let sum = d.read(cx).summary();
             if this.last_summary.as_ref() != Some(&sum) {
+                let had_selection = this
+                    .last_summary
+                    .as_ref()
+                    .is_some_and(|s| s.0.is_some() || !s.1.is_empty());
+                let now_has_selection = sum.0.is_some() || !sum.1.is_empty();
+                if now_has_selection && !had_selection {
+                    this.inspector_open = true;
+                    this.save_prefs();
+                }
                 this.last_summary = Some(sum);
                 cx.notify();
             }
@@ -271,6 +339,12 @@ impl Shell {
                 DiagramEvent::Rename(table) => {
                     this.inspector_open = true;
                     this.start_edit(EditTarget::Table(table.clone()), table.clone(), window, cx);
+                }
+                DiagramEvent::Select(table) => {
+                    let _ = table;
+                    this.inspector_open = true;
+                    this.save_prefs();
+                    cx.notify();
                 }
             },
         );
@@ -334,6 +408,8 @@ impl Shell {
         let title = format!("sem-titulo-{}.dbml", self.untitled);
         self.add_doc(String::new(), None, title, window, cx);
         self.editor_open = true;
+        self.sidebar_open = false;
+        self.save_prefs();
     }
 
     fn open_file(&mut self, _: &OpenFile, window: &mut Window, cx: &mut Context<Self>) {
@@ -448,15 +524,34 @@ impl Shell {
         }
     }
 
-    fn show_pane(&mut self, pane: Pane, cx: &mut Context<Self>) {
-        // clicar no painel já aberto recolhe a barra lateral (como no VS Code)
-        if self.sidebar_open && self.pane == pane {
-            self.sidebar_open = false;
-        } else {
-            self.pane = pane;
-            self.sidebar_open = true;
+    fn toggle_left_pane(&mut self, target: Option<Pane>, cx: &mut Context<Self>) {
+        match target {
+            Some(pane) => {
+                // clicar no painel já aberto recolhe a barra lateral; caso contrário abre exclusivamente
+                if self.sidebar_open && !self.editor_open && self.pane == pane {
+                    self.sidebar_open = false;
+                } else {
+                    self.pane = pane;
+                    self.sidebar_open = true;
+                    self.editor_open = false;
+                }
+            }
+            None => {
+                // alternar editor DBML de forma exclusiva com os outros painéis esquerdos
+                if self.editor_open {
+                    self.editor_open = false;
+                } else {
+                    self.editor_open = true;
+                    self.sidebar_open = false;
+                }
+            }
         }
+        self.save_prefs();
         cx.notify();
+    }
+
+    fn show_pane(&mut self, pane: Pane, cx: &mut Context<Self>) {
+        self.toggle_left_pane(Some(pane), cx);
     }
 
     fn show_files(&mut self, _: &ShowFiles, _: &mut Window, cx: &mut Context<Self>) {
@@ -517,6 +612,8 @@ impl Shell {
     /// Abre o editor e põe o cursor no início do diagnóstico.
     fn reveal(&mut self, offset: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.editor_open = true;
+        self.sidebar_open = false;
+        self.save_prefs();
         if let Some(doc) = self.doc() {
             doc.editor.update(cx, |e, cx| {
                 let text = e.value().to_string();
@@ -636,13 +733,35 @@ impl Shell {
         let sub = cx.subscribe_in(
             &state,
             window,
-            |this: &mut Shell, _, ev: &InputEvent, window, cx| {
-                if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+            |this: &mut Shell, _, ev: &InputEvent, window, cx| match ev {
+                InputEvent::Change => {
+                    cx.notify();
+                }
+                InputEvent::PressEnter { .. } | InputEvent::Blur => {
                     this.commit_edit(window, cx);
                 }
+                _ => {}
             },
         );
         self.editing = Some((target, state, sub));
+        cx.notify();
+    }
+
+    /// Aplica um tipo selecionado via autocomplete imediatamente.
+    fn apply_column_type(
+        &mut self,
+        table: String,
+        col: String,
+        ty: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.editing = None;
+        if !ty.is_empty() {
+            self.edit_text(false, window, cx, |t| {
+                dbml_edit::set_column_type(t, &table, &col, &ty)
+            });
+        }
         cx.notify();
     }
 
@@ -802,19 +921,68 @@ impl Shell {
             sidebar_w: self.widths.0,
             editor_w: self.widths.1,
             inspector_w: self.widths.2,
+            col_type_w: self.col_type_w,
             translucent_cards: self.translucent_cards,
+            ui_scale: self.ui_scale,
+            inspector_auto_hide: self.inspector_auto_hide,
+            sidebar_open: self.sidebar_open,
+            inspector_open: self.inspector_open,
         });
     }
 
     fn apply_appearance(&mut self, cx: &mut Context<Self>) {
-        apply_theme(self.mode, cx);
+        apply_theme_scaled(self.mode, self.ui_scale, cx);
         self.save_prefs();
+        cx.notify();
+    }
+
+    fn set_ui_scale(&mut self, scale: f32, window: &mut Window, cx: &mut Context<Self>) {
+        self.ui_scale = (scale * 100.0).round() / 100.0;
+        self.apply_appearance(cx);
+        window.push_notification(
+            format!(
+                "Escala da interface: {}%",
+                (self.ui_scale * 100.0).round() as i32
+            ),
+            cx,
+        );
+    }
+
+    fn zoom_in_ui(&mut self, _: &ZoomInUi, window: &mut Window, cx: &mut Context<Self>) {
+        let next = (self.ui_scale + 0.1).min(1.8);
+        self.set_ui_scale(next, window, cx);
+    }
+
+    fn zoom_out_ui(&mut self, _: &ZoomOutUi, window: &mut Window, cx: &mut Context<Self>) {
+        let next = (self.ui_scale - 0.1).max(0.75);
+        self.set_ui_scale(next, window, cx);
+    }
+
+    fn reset_ui_zoom(&mut self, _: &ResetUiZoom, window: &mut Window, cx: &mut Context<Self>) {
+        self.set_ui_scale(1.0, window, cx);
+    }
+
+    fn toggle_auto_collapse_inspector(
+        &mut self,
+        _: &ToggleAutoCollapseInspector,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.inspector_auto_hide = !self.inspector_auto_hide;
+        self.save_prefs();
+        let msg = if self.inspector_auto_hide {
+            "Inspector: ocultar quando nada selecionado (ativado)"
+        } else {
+            "Inspector: sempre visível (desativado)"
+        };
+        window.push_notification(msg, cx);
         cx.notify();
     }
 
     fn reset_panels(&mut self, _: &ResetPanels, _: &mut Window, cx: &mut Context<Self>) {
         let d = crate::settings::Settings::default();
         self.widths = (d.sidebar_w, d.editor_w, d.inspector_w);
+        self.col_type_w = d.col_type_w;
         self.panels_gen += 1;
         self.save_prefs();
         cx.notify();
@@ -832,17 +1000,23 @@ impl Shell {
     }
 
     fn toggle_editor(&mut self, _: &ToggleEditor, _: &mut Window, cx: &mut Context<Self>) {
-        self.editor_open = !self.editor_open;
-        cx.notify();
+        self.toggle_left_pane(None, cx);
     }
 
     fn toggle_sidebar(&mut self, _: &ToggleSidebar, _: &mut Window, cx: &mut Context<Self>) {
-        self.sidebar_open = !self.sidebar_open;
+        if self.sidebar_open && !self.editor_open {
+            self.sidebar_open = false;
+        } else {
+            self.sidebar_open = true;
+            self.editor_open = false;
+        }
+        self.save_prefs();
         cx.notify();
     }
 
     fn toggle_inspector(&mut self, _: &ToggleInspector, _: &mut Window, cx: &mut Context<Self>) {
         self.inspector_open = !self.inspector_open;
+        self.save_prefs();
         cx.notify();
     }
 
@@ -887,7 +1061,8 @@ impl Shell {
             .items_end()
             .gap(px(2.))
             .min_w_0()
-            .overflow_hidden();
+            .flex_shrink(1.0)
+            .overflow_x_hidden();
         for (i, doc) in self.docs.iter().enumerate() {
             let on = i == self.active;
             tabs = tabs.child(
@@ -898,6 +1073,8 @@ impl Shell {
                     .group("tab")
                     .h(px(32.))
                     .max_w(px(220.))
+                    .min_w(px(70.))
+                    .flex_shrink(1.0)
                     .pl(px(10.))
                     .pr(px(4.))
                     .flex()
@@ -1022,13 +1199,41 @@ impl Shell {
                     .id("titlebar-drag")
                     .window_control_area(WindowControlArea::Drag)
                     .flex_1()
-                    .h_full(),
+                    .h_full()
+                    .when(cfg!(not(windows)), |d| {
+                        d.on_double_click(|_, window, _| window.zoom_window())
+                            .on_mouse_down_out(cx.listener(|this, _, _, _| {
+                                this.dragging_window = false;
+                            }))
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _, _| {
+                                    this.dragging_window = true;
+                                }),
+                            )
+                            .on_mouse_down(MouseButton::Right, |ev, window, _| {
+                                window.show_window_menu(ev.position);
+                            })
+                            .on_mouse_up(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _, _| {
+                                    this.dragging_window = false;
+                                }),
+                            )
+                            .on_mouse_move(cx.listener(|this, _, window, _| {
+                                if this.dragging_window {
+                                    this.dragging_window = false;
+                                    window.start_window_move();
+                                }
+                            }))
+                    }),
             )
             .child(
                 div()
                     .id("palette-pill")
                     .role(Role::Button)
                     .aria_label("Buscar comandos (Ctrl+K)")
+                    .flex_none()
                     .flex()
                     .items_center()
                     .gap(SP_SM)
@@ -1054,12 +1259,16 @@ impl Shell {
                     }),
             )
             .child(
-                Button::new("theme-toggle")
-                    .ghost()
-                    .small()
-                    .icon(theme_icon)
-                    .tooltip_with_action("Alternar tema", &ToggleTheme, Some(actions::CTX))
-                    .on_click(|_, window, cx| window.dispatch_action(Box::new(ToggleTheme), cx)),
+                div().flex_none().child(
+                    Button::new("theme-toggle")
+                        .ghost()
+                        .small()
+                        .icon(theme_icon)
+                        .tooltip_with_action("Alternar tema", &ToggleTheme, Some(actions::CTX))
+                        .on_click(|_, window, cx| {
+                            window.dispatch_action(Box::new(ToggleTheme), cx)
+                        }),
+                ),
             );
         #[cfg(windows)]
         {
@@ -1098,6 +1307,7 @@ impl Shell {
             bar = bar.child(
                 div()
                     .h_full()
+                    .flex_none()
                     .flex()
                     .child(caption(
                         "cap-min",
@@ -1124,8 +1334,105 @@ impl Shell {
         }
         #[cfg(not(windows))]
         {
-            let _ = maximized;
-            bar = bar.pr(SP_SM);
+            let (max_label, max_icon) = if maximized {
+                ("Restaurar", IconName::WindowRestore)
+            } else {
+                ("Maximizar", IconName::WindowMaximize)
+            };
+
+            bar = bar.child(
+                div()
+                    .h_full()
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .child(
+                        div()
+                            .id("cap-min")
+                            .role(Role::Button)
+                            .aria_label("Minimizar")
+                            .occlude()
+                            .w(px(38.))
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(g.text_muted)
+                            .hover({
+                                let h = g.hover;
+                                let ink = g.text;
+                                move |s| s.bg(h).text_color(ink)
+                            })
+                            .active({
+                                let h = g.hover;
+                                move |s| s.bg(h.opacity(0.8))
+                            })
+                            .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                window.prevent_default();
+                                cx.stop_propagation();
+                            })
+                            .on_click(|_, window, cx| {
+                                cx.stop_propagation();
+                                window.minimize_window();
+                            })
+                            .child(Icon::new(IconName::WindowMinimize).small()),
+                    )
+                    .child(
+                        div()
+                            .id("cap-max")
+                            .role(Role::Button)
+                            .aria_label(max_label)
+                            .occlude()
+                            .w(px(38.))
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(g.text_muted)
+                            .hover({
+                                let h = g.hover;
+                                let ink = g.text;
+                                move |s| s.bg(h).text_color(ink)
+                            })
+                            .active({
+                                let h = g.hover;
+                                move |s| s.bg(h.opacity(0.8))
+                            })
+                            .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                window.prevent_default();
+                                cx.stop_propagation();
+                            })
+                            .on_click(|_, window, cx| {
+                                cx.stop_propagation();
+                                window.zoom_window();
+                            })
+                            .child(Icon::new(max_icon).small()),
+                    )
+                    .child(
+                        div()
+                            .id("cap-close")
+                            .role(Role::Button)
+                            .aria_label("Fechar")
+                            .occlude()
+                            .w(px(38.))
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(g.text_muted)
+                            .hover(move |s| s.bg(CAPTION_CLOSE).text_color(gpui_kit::white()))
+                            .active(move |s| s.bg(CAPTION_CLOSE.opacity(0.8)))
+                            .on_mouse_down(MouseButton::Left, |_, window, cx| {
+                                window.prevent_default();
+                                cx.stop_propagation();
+                            })
+                            .on_click(|_, _, cx| {
+                                cx.stop_propagation();
+                                cx.quit();
+                            })
+                            .child(Icon::new(IconName::WindowClose).small()),
+                    ),
+            );
         }
         bar
     }
@@ -1137,9 +1444,9 @@ impl Shell {
                     icon: IconName,
                     tip: &'static str,
                     action: Box<dyn Action>,
-                    pane: Option<Pane>,
+                    is_active: bool,
                     badge: usize| {
-            let on = pane.is_some_and(|p| self.sidebar_open && self.pane == p);
+            let on = is_active;
             let tip_action = action.boxed_clone();
             div()
                 .id(id)
@@ -1208,7 +1515,7 @@ impl Shell {
                 IconName::Folder,
                 "Arquivos do projeto",
                 Box::new(ShowFiles),
-                Some(Pane::Files),
+                self.sidebar_open && !self.editor_open && self.pane == Pane::Files,
                 0,
             ))
             .child(item(
@@ -1216,7 +1523,7 @@ impl Shell {
                 IconName::Table2,
                 "Esquema",
                 Box::new(ShowSchema),
-                Some(Pane::Schema),
+                self.sidebar_open && !self.editor_open && self.pane == Pane::Schema,
                 0,
             ))
             .child(item(
@@ -1224,7 +1531,7 @@ impl Shell {
                 IconName::TriangleAlert,
                 "Problemas",
                 Box::new(ShowProblems),
-                Some(Pane::Problems),
+                self.sidebar_open && !self.editor_open && self.pane == Pane::Problems,
                 errors,
             ))
             .child(item(
@@ -1232,21 +1539,49 @@ impl Shell {
                 IconName::Braces,
                 "Editor DBML",
                 Box::new(ToggleEditor),
-                None,
+                self.editor_open,
                 0,
             ))
             .child(div().flex_1())
             .child({
-                let (mode, translucent) = (self.mode, self.translucent_cards);
+                let (mode, translucent, ui_scale, auto_hide) = (
+                    self.mode,
+                    self.translucent_cards,
+                    self.ui_scale,
+                    self.inspector_auto_hide,
+                );
                 Button::new("rail-appearance")
                     .ghost()
                     .icon(IconName::Palette)
-                    .tooltip("Aparência: tema e cartões")
+                    .tooltip("Aparência, tamanho da interface e painéis")
                     .dropdown_menu(move |menu, _, _| {
                         menu.label("Tema")
                             .menu_with_check("Escuro", mode == Mode::Dark, Box::new(ToggleTheme))
                             .menu_with_check("Claro", mode == Mode::Light, Box::new(ToggleTheme))
                             .separator()
+                            .label("Tamanho da interface (Ctrl+Shift+= / -)")
+                            .menu_with_check(
+                                "Padrão (100%)",
+                                (ui_scale - 1.0).abs() < 0.05,
+                                Box::new(ResetUiZoom),
+                            )
+                            .menu_with_check(
+                                "Médio (115%)",
+                                (ui_scale - 1.15).abs() < 0.05,
+                                Box::new(ZoomInUi),
+                            )
+                            .menu_with_check(
+                                "Grande (130%)",
+                                (ui_scale - 1.30).abs() < 0.05,
+                                Box::new(ZoomInUi),
+                            )
+                            .separator()
+                            .label("Painéis")
+                            .menu_with_check(
+                                "Recolher inspector quando nada selecionado",
+                                auto_hide,
+                                Box::new(ToggleAutoCollapseInspector),
+                            )
                             .menu_with_check(
                                 "Cartões translúcidos",
                                 translucent,
@@ -1259,7 +1594,7 @@ impl Shell {
                 IconName::Keyboard,
                 "Atalhos de teclado",
                 Box::new(ShowShortcuts),
-                None,
+                false,
                 0,
             ))
             .child(item(
@@ -1267,9 +1602,108 @@ impl Shell {
                 IconName::Command,
                 "Paleta de comandos",
                 Box::new(OpenPalette),
-                None,
+                false,
                 0,
             ))
+    }
+
+    /// Barra de atividades da direita (Inspector e Legenda), simétrica à barra da esquerda.
+    fn right_rail(&self, g: &Glass, cx: &App) -> Div {
+        let (has_selection, legend_open) = self.doc().map_or((false, false), |d| {
+            let diag = d.diagram.read(cx);
+            (
+                diag.selected().is_some() || !diag.selection().is_empty(),
+                diag.legend_open,
+            )
+        });
+
+        let item = |id: &'static str,
+                    icon: IconName,
+                    tip: &'static str,
+                    action: Box<dyn Action>,
+                    is_active: bool,
+                    badge: usize| {
+            let on = is_active;
+            let tip_action = action.boxed_clone();
+            div()
+                .id(id)
+                .role(Role::Tab)
+                .aria_label(tip)
+                .relative()
+                .size(px(34.))
+                .rounded(px(7.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_color(if on { g.text } else { g.text_faint })
+                .when(on, |d| d.bg(g.hover))
+                .hover({
+                    let (h, t) = (g.hover, g.text);
+                    move |s| s.bg(h).text_color(t)
+                })
+                .active({
+                    let a = g.active;
+                    move |s| s.bg(a)
+                })
+                .tooltip(move |window, cx| {
+                    Tooltip::new(tip)
+                        .action(tip_action.as_ref(), Some(actions::CTX))
+                        .build(window, cx)
+                })
+                .on_click(move |_, window, cx| window.dispatch_action(action.boxed_clone(), cx))
+                .child(Icon::new(icon))
+                .when(badge > 0, |d| {
+                    d.child(
+                        div()
+                            .absolute()
+                            .top(px(3.))
+                            .right(px(3.))
+                            .min_w(px(14.))
+                            .h(px(14.))
+                            .px(px(3.))
+                            .rounded_full()
+                            .bg(g.accent.opacity(0.25))
+                            .border_1()
+                            .border_color(g.accent.opacity(0.6))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_size(px(9.))
+                            .text_color(g.accent)
+                            .child(badge.to_string()),
+                    )
+                })
+        };
+
+        div()
+            .w(RAIL_W)
+            .h_full()
+            .flex_none()
+            .flex()
+            .flex_col()
+            .items_center()
+            .gap(px(4.))
+            .py(px(8.))
+            .bg(g.chrome)
+            .border_l_1()
+            .border_color(g.edge)
+            .child(item(
+                "rail-inspector",
+                IconName::SlidersHorizontal,
+                "Inspector / Detalhes (Ctrl+I)",
+                Box::new(ToggleInspector),
+                self.inspector_open,
+                if has_selection { 1 } else { 0 },
+            ))
+            .child(item(
+                "rail-legend",
+                IconName::Info,
+                "Legenda do diagrama (Ctrl+Shift+L)",
+                Box::new(ToggleLegend),
+                legend_open,
+                0,
+            ))
+            .child(div().flex_1())
     }
 
     fn section(g: &Glass, text: impl Into<SharedString>, count: Option<usize>) -> Div {
@@ -1313,11 +1747,83 @@ impl Shell {
 
     fn files_pane(&self, g: &Glass, cx: &mut Context<Self>) -> Div {
         let active_path = self.doc().and_then(|d| d.path.clone());
-        let mut list = div().flex().flex_col().gap(px(1.));
-        let title = match &self.project {
-            Some(p) => file_title(p).to_uppercase(),
-            None => "ARQUIVOS ABERTOS".into(),
+        let mut list = div().flex().flex_col().gap(px(2.)).px(px(6.));
+
+        let (folder_title, count) = match &self.project {
+            Some(p) => (file_title(p), self.files.len()),
+            None => ("Arquivos Abertos".to_string(), self.docs.len()),
         };
+
+        let header = div()
+            .flex()
+            .justify_between()
+            .items_center()
+            .px(SP_MD)
+            .pt(SP_MD)
+            .pb(px(8.))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(6.))
+                    .min_w_0()
+                    .flex_1()
+                    .child(
+                        Icon::new(if self.project.is_some() {
+                            IconName::FolderOpen
+                        } else {
+                            IconName::Files
+                        })
+                        .xsmall()
+                        .text_color(g.accent),
+                    )
+                    .child(
+                        div()
+                            .text_size(TEXT_SM)
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(g.text)
+                            .truncate()
+                            .child(folder_title),
+                    )
+                    .child(
+                        div()
+                            .px(px(5.))
+                            .py(px(1.))
+                            .rounded_full()
+                            .bg(g.hover)
+                            .text_size(px(10.))
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(g.text_muted)
+                            .child(count.to_string()),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(2.))
+                    .child(
+                        Button::new("pane-new-file")
+                            .ghost()
+                            .xsmall()
+                            .icon(IconName::Plus)
+                            .tooltip_with_action("Novo arquivo", &NewFile, Some(actions::CTX))
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(Box::new(NewFile), cx)
+                            }),
+                    )
+                    .child(
+                        Button::new("pane-open-folder")
+                            .ghost()
+                            .xsmall()
+                            .icon(IconName::FolderOpen)
+                            .tooltip_with_action("Abrir pasta", &OpenFolder, Some(actions::CTX))
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(Box::new(OpenFolder), cx)
+                            }),
+                    ),
+            );
+
         if let Some(root) = self.project.clone() {
             for (i, f) in self.files.iter().enumerate() {
                 let on = active_path.as_ref() == Some(f);
@@ -1328,80 +1834,192 @@ impl Shell {
                     .map(|p| p.display().to_string())
                     .unwrap_or_default();
                 let path = f.clone();
+                let fname = file_title(f);
+                let is_dirty = self
+                    .docs
+                    .iter()
+                    .find(|d| d.path.as_ref() == Some(f))
+                    .is_some_and(|d| d.dirty);
+
                 list = list.child(
-                    Self::row(g, ("file", i), on)
-                        .aria_label(file_title(f))
+                    div()
+                        .id(("file", i))
+                        .role(Role::Button)
+                        .aria_label(fname.clone())
+                        .h(px(32.))
+                        .px(px(8.))
+                        .rounded(px(6.))
+                        .flex()
+                        .items_center()
+                        .gap(px(7.))
+                        .text_size(TEXT_SM)
+                        .text_color(if on { g.text } else { g.text_muted })
+                        .when(on, |d| {
+                            d.bg(g.selected)
+                                .font_weight(FontWeight::MEDIUM)
+                                .border_l_2()
+                                .border_color(g.accent)
+                        })
+                        .when(!on, |d| {
+                            let h = g.hover;
+                            d.hover(move |s| s.bg(h))
+                        })
+                        .active({
+                            let a = g.active;
+                            move |s| s.bg(a)
+                        })
                         .on_click(cx.listener(move |this, _, window, cx| {
                             this.open_path(path.clone(), window, cx)
                         }))
                         .child(
-                            Icon::new(IconName::FileText)
-                                .xsmall()
-                                .text_color(g.text_faint),
+                            Icon::new(IconName::Database)
+                                .size(px(14.))
+                                .text_color(if on { g.accent } else { g.text_faint }),
                         )
-                        .child(div().truncate().child(file_title(f)))
                         .child(
                             div()
                                 .flex_1()
-                                .truncate()
-                                .text_size(TEXT_XS)
+                                .min_w_0()
+                                .flex()
+                                .flex_col()
+                                .justify_center()
+                                .child(div().truncate().child(fname))
+                                .when(!rel.is_empty(), |d| {
+                                    d.child(
+                                        div()
+                                            .text_size(px(10.))
+                                            .text_color(g.text_faint)
+                                            .truncate()
+                                            .child(rel),
+                                    )
+                                }),
+                        )
+                        .child(
+                            div()
+                                .px(px(4.))
+                                .py(px(1.))
+                                .rounded(px(3.))
+                                .bg(g.edge_soft)
+                                .text_size(px(9.))
+                                .font_weight(FontWeight::MEDIUM)
                                 .text_color(g.text_faint)
-                                .child(rel),
-                        ),
+                                .child("DBML"),
+                        )
+                        .when(is_dirty, |r| {
+                            r.child(div().size(px(6.)).rounded_full().bg(g.accent))
+                        }),
                 );
             }
         } else {
             for (i, d) in self.docs.iter().enumerate() {
+                let on = i == self.active;
+                let title = d.title.clone();
                 list = list.child(
-                    Self::row(g, ("open", i), i == self.active)
-                        .aria_label(d.title.clone())
+                    div()
+                        .id(("open", i))
+                        .role(Role::Button)
+                        .aria_label(title.clone())
+                        .h(px(32.))
+                        .px(px(8.))
+                        .rounded(px(6.))
+                        .flex()
+                        .items_center()
+                        .gap(px(7.))
+                        .text_size(TEXT_SM)
+                        .text_color(if on { g.text } else { g.text_muted })
+                        .when(on, |st| {
+                            st.bg(g.selected)
+                                .font_weight(FontWeight::MEDIUM)
+                                .border_l_2()
+                                .border_color(g.accent)
+                        })
+                        .when(!on, |st| {
+                            let h = g.hover;
+                            st.hover(move |s| s.bg(h))
+                        })
+                        .active({
+                            let a = g.active;
+                            move |s| s.bg(a)
+                        })
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.active = i;
                             cx.notify();
                         }))
                         .child(
-                            Icon::new(IconName::FileText)
-                                .xsmall()
-                                .text_color(g.text_faint),
+                            Icon::new(IconName::Database)
+                                .size(px(14.))
+                                .text_color(if on { g.accent } else { g.text_faint }),
                         )
-                        .child(div().flex_1().truncate().child(d.title.clone()))
+                        .child(div().flex_1().truncate().child(title))
+                        .child(
+                            div()
+                                .px(px(4.))
+                                .py(px(1.))
+                                .rounded(px(3.))
+                                .bg(g.edge_soft)
+                                .text_size(px(9.))
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(g.text_faint)
+                                .child("DBML"),
+                        )
                         .when(d.dirty, |r| {
-                            r.child(div().size(px(6.)).rounded_full().bg(g.text_muted))
+                            r.child(div().size(px(6.)).rounded_full().bg(g.accent))
                         }),
                 );
             }
         }
+
         div()
             .flex()
             .flex_col()
-            .child(Self::section(g, title, None))
+            .gap(px(4.))
+            .child(header)
             .child(list)
             .when(self.project.is_none(), |d| {
                 d.child(
                     div()
-                        .p(SP_LG)
+                        .mx(px(8.))
+                        .mt(SP_MD)
+                        .p(SP_MD)
+                        .rounded(px(8.))
+                        .border_1()
+                        .border_color(g.edge)
+                        .bg(g.surface.opacity(0.4))
                         .flex()
-                        .justify_center()
-                        .child(crate::widgets::empty_state(
-                            g,
-                            IconName::FolderOpen,
-                            "Nenhuma pasta aberta",
-                            "Um projeto é uma pasta com um ou mais arquivos .dbml.",
-                            crate::widgets::EmptyAction {
-                                id: "files-folder",
-                                icon: IconName::FolderOpen,
-                                label: "Abrir pasta",
-                                keys: "Ctrl+Shift+O",
-                                action: Box::new(OpenFolder),
-                            },
-                            crate::widgets::EmptyAction {
-                                id: "files-new",
-                                icon: IconName::Plus,
-                                label: "Novo arquivo",
-                                keys: "Ctrl+N",
-                                action: Box::new(NewFile),
-                            },
-                        )),
+                        .flex_col()
+                        .items_center()
+                        .text_center()
+                        .gap(px(6.))
+                        .child(
+                            Icon::new(IconName::FolderOpen)
+                                .size(px(24.))
+                                .text_color(g.text_faint),
+                        )
+                        .child(
+                            div()
+                                .text_size(TEXT_SM)
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(g.text)
+                                .child("Abrir Pasta de Projeto"),
+                        )
+                        .child(
+                            div()
+                                .text_size(TEXT_XS)
+                                .text_color(g.text_muted)
+                                .child("Navegue entre todos os arquivos .dbml de forma integrada."),
+                        )
+                        .child(
+                            div().mt(px(4.)).child(
+                                Button::new("banner-open-folder")
+                                    .primary()
+                                    .small()
+                                    .icon(IconName::FolderOpen)
+                                    .label("Abrir pasta…")
+                                    .on_click(|_, window, cx| {
+                                        window.dispatch_action(Box::new(OpenFolder), cx)
+                                    }),
+                            ),
+                        ),
                 )
             })
     }
@@ -1420,6 +2038,9 @@ impl Shell {
                 .on_click(cx.listener(move |this, _, _, cx| {
                     let n = name.clone();
                     this.with_diagram(cx, |d| d.focus_table(&n));
+                    this.inspector_open = true;
+                    this.save_prefs();
+                    cx.notify();
                 }))
                 .child(
                     Icon::new(IconName::Table2)
@@ -1725,7 +2346,55 @@ impl Shell {
                     }
                 }
             };
+            let col_type_w = self.col_type_w;
             let mut cols = div().flex().flex_col();
+            let col_header = div()
+                .flex()
+                .items_center()
+                .gap(px(6.))
+                .px(SP_MD)
+                .py(px(4.))
+                .border_b_1()
+                .border_color(g.edge_soft)
+                .text_size(px(10.))
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(g.text_faint)
+                .child(div().flex_1().min_w(px(60.)).child("NOME"))
+                .child(
+                    div()
+                        .id("col-splitter-hdr")
+                        .w(px(8.))
+                        .h(px(14.))
+                        .mx(px(-2.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor(CursorStyle::ResizeLeftRight)
+                        .tooltip(|window, cx| {
+                            Tooltip::new(
+                                "Arrastar para redimensionar colunas (duplo-clique restaura)",
+                            )
+                            .build(window, cx)
+                        })
+                        .hover(|s| s.bg(g.hover).rounded(px(2.)))
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                                if e.click_count >= 2 {
+                                    this.col_type_w = 110.0;
+                                    this.save_prefs();
+                                    cx.notify();
+                                } else {
+                                    this.col_resize_start = Some((e.position.x, this.col_type_w));
+                                }
+                            }),
+                        )
+                        .child(div().w(px(1.5)).h(px(10.)).bg(g.edge)),
+                )
+                .child(div().flex_none().w(px(col_type_w)).child("TIPO"))
+                .child(div().flex_none().w(px(62.)).child("FLAGS"))
+                .child(div().w(px(16.)));
+            cols = cols.child(col_header);
             for c in &t.columns {
                 let chip = |id: String,
                             label: &'static str,
@@ -1779,6 +2448,10 @@ impl Shell {
                     cx,
                 );
                 let (table, col) = (t.name.clone(), c.name.clone());
+                let is_editing_this_type = matches!(
+                    &editing,
+                    Some((EditTarget::ColType(tbl, col), _)) if tbl == &t.name && col == &c.name
+                );
                 cols = cols.child(
                     div()
                         .group("insp-col")
@@ -1793,14 +2466,36 @@ impl Shell {
                         .child(
                             div()
                                 .flex_1()
-                                .min_w(px(64.))
+                                .min_w(px(60.))
                                 .overflow_hidden()
                                 .child(name_el),
                         )
                         .child(
                             div()
+                                .w(px(4.))
+                                .h(px(14.))
+                                .mx(px(-2.))
                                 .flex_none()
-                                .w(px(70.))
+                                .cursor(CursorStyle::ResizeLeftRight)
+                                .hover(|s| s.bg(g.accent.opacity(0.4)).rounded(px(1.)))
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                                        if e.click_count >= 2 {
+                                            this.col_type_w = 110.0;
+                                            this.save_prefs();
+                                            cx.notify();
+                                        } else {
+                                            this.col_resize_start =
+                                                Some((e.position.x, this.col_type_w));
+                                        }
+                                    }),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .flex_none()
+                                .w(px(col_type_w))
                                 .overflow_hidden()
                                 .text_size(TEXT_XS)
                                 .child(type_el),
@@ -1833,20 +2528,142 @@ impl Shell {
                                 ),
                         ),
                 );
+
+                if is_editing_this_type {
+                    let query = if let Some((_, st)) = &editing {
+                        st.read(cx).value().trim().to_ascii_lowercase()
+                    } else {
+                        String::new()
+                    };
+
+                    let doc_text = self
+                        .doc()
+                        .map(|d| d.editor.read(cx).value().to_string())
+                        .unwrap_or_default();
+                    let enums = extract_enums_from_dbml(&doc_text);
+
+                    let mut suggestions: Vec<(&str, &str)> = Vec::new();
+                    for &(ty, desc) in STANDARD_TYPES {
+                        if query.is_empty() || ty.to_ascii_lowercase().contains(&query) {
+                            suggestions.push((ty, desc));
+                        }
+                    }
+                    for en in &enums {
+                        if query.is_empty() || en.to_ascii_lowercase().contains(&query) {
+                            suggestions.push((en.as_str(), "enumeração"));
+                        }
+                    }
+                    suggestions.truncate(8);
+
+                    if !suggestions.is_empty() {
+                        let mut sugg_box = div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(2.))
+                            .p(px(6.))
+                            .mx(SP_MD)
+                            .my(px(2.))
+                            .rounded(px(6.))
+                            .bg(g.island)
+                            .border_1()
+                            .border_color(g.edge)
+                            .shadow_md();
+
+                        sugg_box = sugg_box.child(
+                            div()
+                                .flex()
+                                .justify_between()
+                                .px(px(4.))
+                                .pb(px(2.))
+                                .border_b_1()
+                                .border_color(g.edge_soft)
+                                .text_size(px(10.))
+                                .text_color(g.text_faint)
+                                .child("Sugestões de tipo (clique para aplicar)")
+                                .child("Esc fecha"),
+                        );
+
+                        for (s_type, s_desc) in suggestions {
+                            let opt_type = s_type.to_string();
+                            let (tbl, cl) = (t.name.clone(), c.name.clone());
+                            sugg_box = sugg_box.child(
+                                div()
+                                    .id(SharedString::from(format!(
+                                        "type-opt-{}-{}-{}",
+                                        tbl, cl, opt_type
+                                    )))
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
+                                    .px(px(6.))
+                                    .py(px(3.))
+                                    .rounded(px(4.))
+                                    .cursor_pointer()
+                                    .hover(|s| s.bg(g.hover))
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |this, _, window, cx| {
+                                            this.apply_column_type(
+                                                tbl.clone(),
+                                                cl.clone(),
+                                                opt_type.clone(),
+                                                window,
+                                                cx,
+                                            );
+                                        }),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_size(TEXT_XS)
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_color(g.text)
+                                            .child(s_type.to_string()),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_size(px(10.))
+                                            .text_color(g.text_faint)
+                                            .child(s_desc.to_string()),
+                                    ),
+                            );
+                        }
+                        cols = cols.child(sugg_box);
+                    }
+                }
             }
             let add_table = t.name.clone();
-            cols = cols.child(
-                div().px(SP_MD).py(SP_SM).child(
-                    Button::new("insp-add-col")
-                        .ghost()
-                        .small()
-                        .icon(IconName::Plus)
-                        .label("Adicionar coluna")
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.add_column_to(add_table.clone(), window, cx)
-                        })),
-                ),
-            );
+            cols = cols
+                .child(
+                    div().px(SP_MD).py(SP_SM).child(
+                        Button::new("insp-add-col")
+                            .ghost()
+                            .small()
+                            .icon(IconName::Plus)
+                            .label("Adicionar coluna")
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.add_column_to(add_table.clone(), window, cx)
+                            })),
+                    ),
+                )
+                .on_mouse_move(cx.listener(|this, e: &MouseMoveEvent, _, cx| {
+                    if let Some((start_x, start_w)) = this.col_resize_start {
+                        let delta = f32::from(e.position.x - start_x);
+                        let new_w = (start_w - delta).clamp(60.0, 360.0);
+                        if (new_w - this.col_type_w).abs() >= 0.5 {
+                            this.col_type_w = new_w;
+                            cx.notify();
+                        }
+                    }
+                }))
+                .on_mouse_up(
+                    MouseButton::Left,
+                    cx.listener(|this, _, _, cx| {
+                        if this.col_resize_start.take().is_some() {
+                            this.save_prefs();
+                            cx.notify();
+                        }
+                    }),
+                );
             let title_el = field(EditTarget::Table(t.name.clone()), t.name.clone(), false, cx);
             let mut rels = div().flex().flex_col().gap(px(4.)).px(SP_MD);
             for r in refs {
@@ -2033,7 +2850,29 @@ impl Shell {
                 .flex_col()
                 .gap(px(6.))
                 .p(SP_LG)
-                .child(div().text_size(TEXT_BASE).font_weight(FontWeight::SEMIBOLD).text_color(g.text).child("Nada selecionado"))
+                .child(
+                    div()
+                        .flex()
+                        .justify_between()
+                        .items_center()
+                        .child(
+                            div()
+                                .text_size(TEXT_BASE)
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(g.text)
+                                .child("Nada selecionado"),
+                        )
+                        .child(
+                            Button::new("btn-hide-inspector")
+                                .ghost()
+                                .xsmall()
+                                .icon(IconName::PanelRightClose)
+                                .tooltip("Ocultar inspector (Ctrl+I)")
+                                .on_click(|_, window, cx| {
+                                    window.dispatch_action(Box::new(ToggleInspector), cx)
+                                }),
+                        ),
+                )
                 .child(
                     div()
                         .text_size(TEXT_SM)
@@ -2205,11 +3044,13 @@ impl Shell {
         } else {
             bar = bar.child(div().flex_1());
         }
-        bar.child("DBML").child(if self.mode == Mode::Dark {
-            "Escuro"
-        } else {
-            "Claro"
-        })
+        bar.child(format!("v{}", env!("CARGO_PKG_VERSION")))
+            .child("DBML")
+            .child(if self.mode == Mode::Dark {
+                "Escuro"
+            } else {
+                "Claro"
+            })
     }
 }
 
@@ -2264,20 +3105,29 @@ pub fn register_global_actions(win: AnyWindowHandle, shell: Entity<Shell>, cx: &
         RenameSelected => rename_selected,
         ResetPanels => reset_panels,
         UngroupSelection => ungroup_selection,
+        ZoomInUi => zoom_in_ui,
+        ZoomOutUi => zoom_out_ui,
+        ResetUiZoom => reset_ui_zoom,
+        ToggleAutoCollapseInspector => toggle_auto_collapse_inspector,
     );
 }
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let g = Glass::of(self.mode, self.translucent);
-        // responsivo: em janela estreita recolhe primeiro o inspector, depois a barra lateral
+        let g = Glass::of_scaled(self.mode, self.translucent, self.ui_scale);
+        // responsivo: painéis colapsam apenas em larguras extremamente reduzidas
         let width = f32::from(window.viewport_size().width);
-        let (show_sidebar, show_inspector) = (
-            self.sidebar_open && width >= 900.,
-            self.inspector_open && width >= 1200.,
-        );
+        let has_selection = self.doc().is_some_and(|d| {
+            let diag = d.diagram.read(cx);
+            diag.selected().is_some() || !diag.selection().is_empty()
+        });
+        let show_sidebar = self.sidebar_open && !self.editor_open && width >= 500.;
+        let show_editor = self.editor_open && width >= 500.;
+        let show_inspector =
+            self.inspector_open && (!self.inspector_auto_hide || has_selection) && width >= 600.;
         let titlebar = self.titlebar(&g, window.is_maximized(), width < 1000., cx);
         let rail = self.rail(&g);
+        let right_rail = self.right_rail(&g, cx);
         // o canvas primeiro: ele aplica o ajuste à tela que a barra de status exibe
         let translucent_cards = self.translucent_cards;
         let canvas = self.doc().map(|d| d.diagram.clone()).inspect(|e| {
@@ -2296,72 +3146,103 @@ impl Render for Shell {
         let editor = self.editor_panel(&g);
         let statusbar = self.statusbar(&g, width < 1000., cx);
         let work: AnyElement = match canvas {
-            Some(canvas) => h_resizable(SharedString::from(format!(
-                "main-panels-{}",
-                self.panels_gen
-            )))
-            .on_resize({
-                // grava as larguras quando o usuário arrasta uma divisória
+            Some(canvas) => {
+                let panels_id = SharedString::from(format!(
+                    "main-panels-{}-{}-{}-{}",
+                    self.panels_gen, show_sidebar, show_editor, show_inspector
+                ));
+                let mut resizable = h_resizable(panels_id);
+
+                let has_sb = show_sidebar;
+                let has_ed = show_editor;
+                let has_insp = show_inspector;
                 let weak = cx.entity().downgrade();
-                move |state, _, cx| {
+                resizable = resizable.on_resize(move |state, _, cx| {
                     let sizes = state.read(cx).sizes().clone();
-                    if sizes.len() == 4 {
-                        weak.update(cx, |s, _| {
-                            // painel oculto mede 0: mantém a última largura visível
-                            let keep = |new: Pixels, old: f32| {
-                                if f32::from(new) >= 120. {
-                                    f32::from(new)
-                                } else {
-                                    old
-                                }
-                            };
-                            s.widths = (
-                                keep(sizes[0], s.widths.0),
-                                keep(sizes[1], s.widths.1),
-                                keep(sizes[3], s.widths.2),
-                            );
-                            s.save_prefs();
-                        })
-                        .ok();
-                    }
+                    weak.update(cx, |s, _| {
+                        let mut ix = 0;
+                        if has_sb && sizes.len() > ix {
+                            let w = f32::from(sizes[ix]);
+                            if w >= 120. {
+                                s.widths.0 = w;
+                            }
+                            ix += 1;
+                        }
+                        if has_ed && sizes.len() > ix {
+                            let w = f32::from(sizes[ix]);
+                            if w >= 120. {
+                                s.widths.1 = w;
+                            }
+                            ix += 1;
+                        }
+                        // ix é o canvas
+                        ix += 1;
+                        if has_insp && sizes.len() > ix {
+                            let w = f32::from(sizes[ix]);
+                            if w >= 120. {
+                                s.widths.2 = w;
+                            }
+                        }
+                        s.save_prefs();
+                    })
+                    .ok();
+                });
+
+                if show_sidebar {
+                    resizable = resizable.child(
+                        resizable_panel()
+                            .size(px(self.widths.0))
+                            .size_range(px(180.)..px(440.))
+                            .child(sidebar),
+                    );
                 }
-            })
-            .child(
-                resizable_panel()
-                    .visible(show_sidebar)
-                    .size(px(self.widths.0))
-                    .size_range(px(180.)..px(440.))
-                    .child(sidebar),
-            )
-            .child(
-                resizable_panel()
-                    .visible(self.editor_open)
-                    .size(px(self.widths.1))
-                    .size_range(px(280.)..px(900.))
-                    .child(editor),
-            )
-            .child(
-                resizable_panel().child(div().id("canvas").size_full().bg(g.surface).child(canvas)),
-            )
-            .child(
-                resizable_panel()
-                    .visible(show_inspector)
-                    .size(px(self.widths.2))
-                    .size_range(px(240.)..px(520.))
-                    .child(inspector),
-            )
-            .into_any_element(),
+
+                if show_editor {
+                    resizable = resizable.child(
+                        resizable_panel()
+                            .size(px(self.widths.1))
+                            .size_range(px(280.)..px(900.))
+                            .child(editor),
+                    );
+                }
+
+                resizable = resizable.child(
+                    resizable_panel()
+                        .child(div().id("canvas").size_full().bg(g.surface).child(canvas)),
+                );
+
+                if show_inspector {
+                    resizable = resizable.child(
+                        resizable_panel()
+                            .size(px(self.widths.2))
+                            .size_range(px(240.)..px(800.))
+                            .child(inspector),
+                    );
+                }
+
+                resizable.into_any_element()
+            }
             None => div()
                 .size_full()
                 .flex()
                 .when(show_sidebar, |d| {
                     d.child(
                         div()
-                            .w(SIDEBAR_W)
+                            .w(px(self.widths.0))
                             .h_full()
                             .border_r_1()
                             .border_color(g.edge)
                             .child(sidebar),
+                    )
+                })
+                .when(show_editor, |d| {
+                    d.child(
+                        div()
+                            .w(px(self.widths.1))
+                            .h_full()
+                            .border_r_1()
+                            .border_color(g.edge)
+                            .child(editor),
                     )
                 })
                 .child(self.empty_state(&g))
@@ -2406,6 +3287,10 @@ impl Render for Shell {
             .on_action(cx.listener(Self::reset_panels))
             .on_action(cx.listener(Self::group_selection))
             .on_action(cx.listener(Self::ungroup_selection))
+            .on_action(cx.listener(Self::zoom_in_ui))
+            .on_action(cx.listener(Self::zoom_out_ui))
+            .on_action(cx.listener(Self::reset_ui_zoom))
+            .on_action(cx.listener(Self::toggle_auto_collapse_inspector))
             .size_full()
             .font_family(FONT)
             .text_color(g.text)
@@ -2419,7 +3304,8 @@ impl Render for Shell {
                     .min_h_0()
                     .flex()
                     .child(rail)
-                    .child(div().flex_1().min_w_0().h_full().child(work)),
+                    .child(div().flex_1().min_w_0().h_full().child(work))
+                    .child(right_rail),
             )
             .child(statusbar)
     }

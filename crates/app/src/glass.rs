@@ -17,10 +17,10 @@ pub const SP_MD: Pixels = px(12.);
 pub const SP_LG: Pixels = px(16.);
 
 /// Escala tipográfica (Inter): legenda, secundário, corpo, título de painel.
-pub const TEXT_XS: Pixels = px(11.5);
-pub const TEXT_SM: Pixels = px(12.5);
-pub const TEXT_BASE: Pixels = px(13.5);
-pub const TEXT_LG: Pixels = px(15.);
+pub const TEXT_XS: Pixels = px(12.);
+pub const TEXT_SM: Pixels = px(13.5);
+pub const TEXT_BASE: Pixels = px(14.5);
+pub const TEXT_LG: Pixels = px(16.5);
 
 pub const TITLEBAR_H: Pixels = px(38.);
 pub const STATUSBAR_H: Pixels = px(24.);
@@ -118,6 +118,7 @@ pub fn hex(s: &str) -> Option<Hsla> {
 #[derive(Clone, Copy)]
 pub struct Glass {
     pub mode: Mode,
+    pub ui_scale: f32,
     /// Barra de título, barra de atividades e barra de status.
     pub chrome: Hsla,
     /// Barra lateral e inspector.
@@ -154,8 +155,14 @@ fn c(v: u32) -> Hsla {
 impl Glass {
     /// `translucent`: chrome e laterais com alfa sobre o blur da janela. Só faz sentido
     /// onde o sistema desfoca o fundo (Windows); sem blur, tudo opaco para não "sujar".
+    #[allow(dead_code)]
     pub fn of(mode: Mode, translucent: bool) -> Self {
+        Self::of_scaled(mode, translucent, 1.0)
+    }
+
+    pub fn of_scaled(mode: Mode, translucent: bool, ui_scale: f32) -> Self {
         let mut g = Self::base(mode);
+        g.ui_scale = ui_scale;
         if translucent {
             let a = if mode == Mode::Dark { 0.62 } else { 0.76 };
             g.chrome = g.chrome.opacity(a);
@@ -167,12 +174,48 @@ impl Glass {
         g
     }
 
+    #[allow(dead_code)]
+    pub fn font_xs(&self) -> Pixels {
+        px((12. * self.ui_scale).round())
+    }
+
+    #[allow(dead_code)]
+    pub fn font_sm(&self) -> Pixels {
+        px((13.5 * self.ui_scale).round())
+    }
+
+    #[allow(dead_code)]
+    pub fn font_base(&self) -> Pixels {
+        px((14.5 * self.ui_scale).round())
+    }
+
+    #[allow(dead_code)]
+    pub fn font_lg(&self) -> Pixels {
+        px((16.5 * self.ui_scale).round())
+    }
+
+    #[allow(dead_code)]
+    pub fn icon_sm(&self) -> Pixels {
+        px((14. * self.ui_scale).round())
+    }
+
+    #[allow(dead_code)]
+    pub fn icon_md(&self) -> Pixels {
+        px((17. * self.ui_scale).round())
+    }
+
+    #[allow(dead_code)]
+    pub fn icon_lg(&self) -> Pixels {
+        px((20. * self.ui_scale).round())
+    }
+
     fn base(mode: Mode) -> Self {
         match mode {
             // hierarquia (como no Zed): chrome mais claro > laterais > área de trabalho;
             // a aba ativa tem a cor da área de trabalho e "funde" com o conteúdo
             Mode::Dark => Self {
                 mode,
+                ui_scale: 1.0,
                 chrome: c(0x131314ff),
                 sidebar: c(0x101011ff),
                 surface: c(0x0a0a0bff),
@@ -195,6 +238,7 @@ impl Glass {
             },
             Mode::Light => Self {
                 mode,
+                ui_scale: 1.0,
                 chrome: c(0xe4e6eaff),
                 sidebar: c(0xeef0f3ff),
                 surface: c(0xf7f7f8ff),
