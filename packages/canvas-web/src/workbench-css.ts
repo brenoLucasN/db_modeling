@@ -42,6 +42,8 @@ export const WORKBENCH_CSS = `
 .wb .surface { flex: 1; min-width: 0; position: relative; overflow: hidden; background: var(--surface); outline: none; }
 .wb .world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
 .wb .world svg.edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.wb .world svg.edges path.edge-hit { pointer-events: stroke; cursor: pointer; }
+.wb .row .fk-badge { font-size: 9.5px; font-weight: 600; padding: 0 4px; border-radius: 3px; background: var(--selected); color: var(--accent); }
 .wb .group { position: absolute; border-radius: 14px; border: 1px solid; }
 .wb .group .gl { position: absolute; top: 8px; left: 10px; height: 22px; padding: 0 8px; border-radius: 6px; display: flex; align-items: center; gap: 6px;
   font-size: 12px; font-weight: 600; cursor: move; }

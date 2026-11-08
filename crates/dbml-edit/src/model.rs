@@ -104,10 +104,34 @@ pub fn add_table(text: &str, name: &str) -> String {
     append_block(text, &format!("Table {name} {{\n  id int [pk]\n}}\n"))
 }
 
-/// Remove a tabela, as `Ref:` de topo que a citam e a sua linha em grupos.
+/// Extrai os endpoints `(from_table, from_col, to_table, to_col)` de um nó `SyntaxKind::Ref`.
+fn parse_top_ref_endpoints(r: &SyntaxNode) -> Option<(String, String, String, String)> {
+    let toks = sig(r);
+    let colon = toks.iter().position(|t| t.text() == ":")?;
+    let body = &toks[colon + 1..];
+    if body.len() < 7 || body[1].text() != "." {
+        return None;
+    }
+    let from_t = unquote(body[0].text()).to_string();
+    let from_c = unquote(body[2].text()).to_string();
+    let mut k = 3;
+    while k < body.len() && matches!(body[k].text(), "<" | ">" | "-") {
+        k += 1;
+    }
+    if body.get(k + 1).map(|t| t.text()) != Some(".") || k + 2 >= body.len() {
+        return None;
+    }
+    let to_t = unquote(body[k].text()).to_string();
+    let to_c = unquote(body[k + 2].text()).to_string();
+    Some((from_t, from_c, to_t, to_c))
+}
+
+/// Remove a tabela, as `Ref:` de topo que a citam, as colunas FK `id_<name>` nas tabelas filhas e a sua linha em grupos.
 pub fn delete_table(text: &str, name: &str) -> String {
     let root = parse(text).syntax();
     let mut edits = Vec::new();
+    let mut fk_cols_to_remove: Vec<(String, String)> = Vec::new();
+
     if let Some(t) = find_table(&root, name) {
         let mut r = line_of(
             text,
@@ -119,6 +143,11 @@ pub fn delete_table(text: &str, name: &str) -> String {
         edits.push((r, String::new()));
     }
     for r in root.children().filter(|n| n.kind() == SyntaxKind::Ref) {
+        if let Some((ft, fc, tt, _)) = parse_top_ref_endpoints(&r) {
+            if tt == name && ft != name && fc.starts_with(&format!("id_{name}")) {
+                fk_cols_to_remove.push((ft.clone(), fc.clone()));
+            }
+        }
         let toks = sig(&r);
         if toks
             .windows(2)
@@ -133,11 +162,25 @@ pub fn delete_table(text: &str, name: &str) -> String {
             ));
         }
     }
+    for (ft, fc) in fk_cols_to_remove {
+        if let Some(t_node) = find_table(&root, &ft)
+            && let Some(c_node) = find_column(&t_node, &fc)
+        {
+            edits.push((
+                line_of(
+                    text,
+                    usize::from(c_node.text_range().start())
+                        ..usize::from(c_node.text_range().end()),
+                ),
+                String::new(),
+            ));
+        }
+    }
     let out = apply(text, edits);
     crate::ungroup_table(&out, name)
 }
 
-/// Renomeia a tabela no cabeçalho, em `tabela.coluna` (refs de topo e inline) e nos grupos.
+/// Renomeia a tabela no cabeçalho, em `tabela.coluna` (refs de topo e inline), colunas FK `id_<old>` e nos grupos.
 pub fn rename_table(text: &str, old: &str, new: &str) -> String {
     let root = parse(text).syntax();
     let mut edits = Vec::new();
@@ -164,7 +207,23 @@ pub fn rename_table(text: &str, old: &str, new: &str) -> String {
             }
         }
     }
-    apply(text, edits)
+    let mut out = apply(text, edits);
+    // Se alguma tabela possui coluna `id_<old>`, renomeia para `id_<new>` atualizando também as Refs
+    let old_fk = format!("id_{old}");
+    let new_fk = format!("id_{new}");
+    let root2 = parse(&out).syntax();
+    let tables_with_fk: Vec<String> = tables(&root2)
+        .filter_map(|t| {
+            let tname = unquote(name_token(&t)?.text()).to_string();
+            find_column(&t, &old_fk).map(|_| tname)
+        })
+        .collect();
+    for tname in tables_with_fk {
+        if let Some(updated) = rename_column(&out, &tname, &old_fk, &new_fk) {
+            out = updated;
+        }
+    }
+    out
 }
 
 pub fn add_column(text: &str, table: &str, name: &str, ty: &str) -> Option<String> {
@@ -176,14 +235,31 @@ pub fn add_column(text: &str, table: &str, name: &str, ty: &str) -> Option<Strin
     crate::edit(text, &cmd).ok().map(|p| p.apply(text))
 }
 
+/// Remove a coluna e todas as `Ref:` de topo que referenciam `table.col`.
 pub fn delete_column(text: &str, table: &str, col: &str) -> Option<String> {
     let root = parse(text).syntax();
     let c = find_column(&find_table(&root, table)?, col)?;
-    let r = line_of(
-        text,
-        usize::from(c.text_range().start())..usize::from(c.text_range().end()),
-    );
-    Some(apply(text, vec![(r, String::new())]))
+    let mut edits = vec![(
+        line_of(
+            text,
+            usize::from(c.text_range().start())..usize::from(c.text_range().end()),
+        ),
+        String::new(),
+    )];
+    for r in root.children().filter(|n| n.kind() == SyntaxKind::Ref) {
+        if let Some((ft, fc, tt, tc)) = parse_top_ref_endpoints(&r)
+            && ((ft == table && fc == col) || (tt == table && tc == col))
+        {
+            edits.push((
+                line_of(
+                    text,
+                    usize::from(r.text_range().start())..usize::from(r.text_range().end()),
+                ),
+                String::new(),
+            ));
+        }
+    }
+    Some(apply(text, edits).trim_end().to_string() + "\n")
 }
 
 pub fn rename_column(text: &str, table: &str, old: &str, new: &str) -> Option<String> {
@@ -284,6 +360,139 @@ pub fn add_ref(text: &str, from: (&str, &str), to: (&str, &str)) -> String {
     out
 }
 
+/// Descobre a coluna PK (ou primeira coluna) de `table` e seu tipo `(nome_col, tipo)`.
+fn primary_key_of(root: &SyntaxNode, table: &str) -> Option<(String, String)> {
+    let t = find_table(root, table)?;
+    let mut first_col: Option<(String, String)> = None;
+    for c in t.children().filter(|n| n.kind() == SyntaxKind::Column) {
+        let toks = sig(&c);
+        let name = unquote(toks.first()?.text()).to_string();
+        let mut ty = String::new();
+        let mut i = 1;
+        while i < toks.len() && toks[i].kind() != SyntaxKind::LBracket {
+            ty.push_str(toks[i].text());
+            i += 1;
+        }
+        if ty.is_empty() {
+            ty = "int".to_string();
+        }
+        let is_pk = toks[i..].iter().any(|k| {
+            k.text().eq_ignore_ascii_case("pk") || k.text().eq_ignore_ascii_case("primary")
+        });
+        if is_pk {
+            return Some((name, ty));
+        }
+        if first_col.is_none() {
+            first_col = Some((name, ty));
+        }
+    }
+    first_col
+}
+
+/// Linka `source_table` à `target_table` criando automaticamente a coluna `id_<source_table>`
+/// (classificada como FK) em `target_table` e adicionando `Ref: target_table.id_<source_table> > source_table.<pk>`.
+pub fn link_tables(text: &str, source_table: &str, target_table: &str) -> String {
+    if source_table == target_table {
+        return text.to_string();
+    }
+    let root = parse(text).syntax();
+    if find_table(&root, source_table).is_none() || find_table(&root, target_table).is_none() {
+        return text.to_string();
+    }
+    let (pk_col, pk_ty) =
+        primary_key_of(&root, source_table).unwrap_or_else(|| ("id".to_string(), "int".to_string()));
+
+    // Idempotência: se já existe Ref entre target_table e source_table.<pk_col>, não duplica
+    for r in root.children().filter(|n| n.kind() == SyntaxKind::Ref) {
+        if let Some((ft, _, tt, tc)) = parse_top_ref_endpoints(&r)
+            && ft == target_table
+            && tt == source_table
+            && tc == pk_col
+        {
+            return text.to_string();
+        }
+    }
+
+    let fk_base = format!("id_{source_table}");
+    let fk_col = if find_table(&root, target_table)
+        .and_then(|t| find_column(&t, &fk_base))
+        .is_some()
+    {
+        // Se a coluna `id_<source_table>` já existe na tabela e não está ligada a outra Ref, reutiliza
+        let used_in_other_ref = root
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::Ref)
+            .filter_map(|r| parse_top_ref_endpoints(&r))
+            .any(|(ft, fc, tt, _)| ft == target_table && fc == fk_base && tt != source_table);
+        if used_in_other_ref {
+            unique_column_name(text, target_table, &fk_base)
+        } else {
+            fk_base.clone()
+        }
+    } else {
+        fk_base.clone()
+    };
+
+    let with_col = if find_table(&root, target_table)
+        .and_then(|t| find_column(&t, &fk_col))
+        .is_some()
+    {
+        text.to_string()
+    } else {
+        add_column(text, target_table, &fk_col, &pk_ty).unwrap_or_else(|| text.to_string())
+    };
+
+    add_ref(&with_col, (target_table, &fk_col), (source_table, &pk_col))
+}
+
+/// Remove a linha `Ref:` entre `from` e `to` (ou inline) e apaga também a coluna FK `from.1` da tabela `from.0`.
+pub fn delete_ref(text: &str, from: (&str, &str), to: (&str, &str)) -> String {
+    let root = parse(text).syntax();
+    let mut edits = Vec::new();
+
+    for r in root.children().filter(|n| n.kind() == SyntaxKind::Ref) {
+        if let Some((ft, fc, tt, tc)) = parse_top_ref_endpoints(&r)
+            && ((ft == from.0 && fc == from.1 && tt == to.0 && tc == to.1)
+                || (ft == to.0 && fc == to.1 && tt == from.0 && tc == from.1))
+        {
+            let mut lr = line_of(
+                text,
+                usize::from(r.text_range().start())..usize::from(r.text_range().end()),
+            );
+            if text[..lr.start].ends_with("\n\n") && lr.end == text.len() {
+                lr.start -= 1;
+            }
+            edits.push((lr, String::new()));
+        }
+    }
+
+    // Apaga também a coluna FK (`from.1` em `from.0`), conforme regra de negócio
+    if let Some(t) = find_table(&root, from.0)
+        && let Some(c) = find_column(&t, from.1)
+    {
+        // Só preserva a coluna se ela for a única coluna `id [pk]` original da tabela sem relação com `id_<tabela>`
+        let toks = sig(&c);
+        let is_sole_id_pk = from.1 == "id"
+            && t.children()
+                .filter(|n| n.kind() == SyntaxKind::Column)
+                .count()
+                == 1
+            && toks.iter().any(|k| k.text().eq_ignore_ascii_case("pk"));
+        if !is_sole_id_pk {
+            edits.push((
+                line_of(
+                    text,
+                    usize::from(c.text_range().start())..usize::from(c.text_range().end()),
+                ),
+                String::new(),
+            ));
+        }
+    }
+
+    let out = apply(text, edits);
+    out.trim_end().to_string() + "\n"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -353,5 +562,59 @@ mod tests {
         assert!(r.ends_with("}\n\nRef: posts.id > users.id\n"), "{r}");
         let only = add_ref("Table a {\n}\nRef: a.x > b.y\n", ("a", "z"), ("b", "w"));
         assert!(only.ends_with("Ref: a.x > b.y\nRef: a.z > b.w\n"), "{only}");
+    }
+
+    #[test]
+    fn link_tables_creates_fk_and_delete_ref_removes_column() {
+        let src = "Table tabela {\n  id int [pk]\n  coluna int\n}\n\nTable tabela_2 {\n  id int [pk]\n}\n";
+        let linked = link_tables(src, "tabela", "tabela_2");
+        assert!(
+            linked.contains("Table tabela_2 {\n  id int [pk]\n  id_tabela int\n}"),
+            "Deve criar id_tabela em tabela_2: {linked}"
+        );
+        assert!(
+            linked.contains("Ref: tabela_2.id_tabela > tabela.id\n"),
+            "Deve criar Ref apontando id_tabela para tabela.id: {linked}"
+        );
+
+        // Idempotência: linkar de novo não duplica
+        let again = link_tables(&linked, "tabela", "tabela_2");
+        assert_eq!(again, linked);
+
+        // Permite marcar id_tabela também como PK (relacionamento 1:1 / herança)
+        let with_pk_fk = set_column_flag(&linked, "tabela_2", "id_tabela", "pk", true).unwrap();
+        assert!(with_pk_fk.contains("id_tabela int [pk]"), "{with_pk_fk}");
+
+        // Excluir a linha (Ref) apaga também a coluna id_tabela
+        let after_del = delete_ref(&linked, ("tabela_2", "id_tabela"), ("tabela", "id"));
+        assert!(
+            !after_del.contains("id_tabela"),
+            "Coluna id_tabela deve ser removida ao excluir a linha: {after_del}"
+        );
+        assert!(
+            !after_del.contains("Ref:"),
+            "Ref deve ser removida: {after_del}"
+        );
+    }
+
+    #[test]
+    fn rename_and_delete_parent_table_cascades_to_fk_column() {
+        let src = "Table tabela {\n  id int [pk]\n}\n\nTable tabela_2 {\n  id int [pk]\n}\n";
+        let linked = link_tables(src, "tabela", "tabela_2");
+        let renamed = rename_table(&linked, "tabela", "clientes");
+        assert!(
+            renamed.contains("id_clientes int"),
+            "Deve renomear id_tabela para id_clientes: {renamed}"
+        );
+        assert!(
+            renamed.contains("Ref: tabela_2.id_clientes > clientes.id"),
+            "Deve atualizar a Ref: {renamed}"
+        );
+
+        let deleted = delete_table(&renamed, "clientes");
+        assert!(
+            !deleted.contains("id_clientes"),
+            "Excluir tabela pai deve remover coluna FK na tabela filha: {deleted}"
+        );
     }
 }

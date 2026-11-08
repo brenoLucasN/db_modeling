@@ -104,6 +104,14 @@ pub enum Command {
     },
     AddRef {
         from_table: String,
+        #[serde(default)]
+        from_col: String,
+        to_table: String,
+        #[serde(default)]
+        to_col: String,
+    },
+    DeleteRef {
+        from_table: String,
         from_col: String,
         to_table: String,
         to_col: String,

@@ -95,6 +95,7 @@ export class Workbench {
   private extraLayout: Partial<SidecarLayout> = {};
 
   private selection: string[] = [];
+  private selectedRef: { from_table: string; from_col: string; to_table: string; to_col: string } | null = null;
   private top: string | null = null;
   private tool: 'select' | 'hand' = 'select';
   private space = false;
@@ -168,6 +169,7 @@ export class Workbench {
           <div class="legend ui" id="legend">
             <h4>Legenda</h4>
             <div><span style="color:var(--accent)">${ICON('KeyRound', 13)}</span> PK · chave primária</div>
+            <div><span style="color:var(--accent)">${ICON('Link2', 13)}</span> FK · chave estrangeira (id_tabela)</div>
             <div><span>${ICON('Link2', 13)}</span> Relação (coluna → coluna)</div>
             <div><b>N · 1</b> Cardinalidade</div>
             <div><span style="color:var(--accent)">■</span> Tabela selecionada e suas relações</div>
@@ -485,13 +487,20 @@ export class Workbench {
       return;
     }
     const sel = new Set(this.selection);
-    const hasSel = sel.size > 0;
+    const hasSel = sel.size > 0 || !!this.selectedRef;
     let svg = '';
     for (const e of sc.edges) {
-      const lit = sel.has(e.from_table) || sel.has(e.to_table);
+      const isSelRef =
+        !!this.selectedRef &&
+        this.selectedRef.from_table === e.from_table &&
+        this.selectedRef.from_col === e.from_col &&
+        this.selectedRef.to_table === e.to_table &&
+        this.selectedRef.to_col === e.to_col;
+      const lit = isSelRef || sel.has(e.from_table) || sel.has(e.to_table);
       const col = lit ? g.accent : g.textMuted;
       const op = lit ? 1 : hasSel ? 0.2 : 0.55;
       svg += `<path d="${e.svg_path}" fill="none" stroke="${col}" stroke-opacity="${op}" stroke-width="${lit ? 2 : 1.5}"/>`;
+      svg += `<path class="edge-hit" d="${e.svg_path}" fill="none" stroke="transparent" stroke-width="14" data-edge="1" data-from-table="${esc(e.from_table)}" data-from-col="${esc(e.from_col)}" data-to-table="${esc(e.to_table)}" data-to-col="${esc(e.to_col)}"/>`;
       svg += `<circle cx="${e.ax}" cy="${e.ay}" r="3" fill="${col}" fill-opacity="${op}"/><circle cx="${e.bx}" cy="${e.by}" r="3" fill="${col}" fill-opacity="${op}"/>`;
       svg += `<text x="${e.start_label_pos.x}" y="${e.start_label_pos.y + 10}" font-size="10" fill="${g.textMuted}" fill-opacity="${op}">${e.start_label}</text>`;
       svg += `<text x="${e.end_label_pos.x}" y="${e.end_label_pos.y + 10}" font-size="10" fill="${g.textMuted}" fill-opacity="${op}">${e.end_label}</text>`;
@@ -533,13 +542,14 @@ export class Workbench {
       const fk = new Set(tv.fk_columns);
       const rows = t.columns
         .map((c) => {
+          const isFk = !!c.fk || fk.has(c.name);
           const ic = c.pk
             ? `<span style="color:var(--accent)">${ICON('KeyRound', 12)}</span>`
-            : fk.has(c.name)
+            : isFk
               ? `<span style="color:var(--muted)">${ICON('Link2', 12)}</span>`
               : '';
           return `<div class="row" data-col="${esc(c.name)}" data-table="${esc(t.name)}"><div class="rail14">${ic}</div>
-            <div class="cn ${c.pk ? 'pk' : ''}">${esc(c.name)}</div><div class="ty">${esc(c.ty)}</div>${c.not_null ? '<div class="nn">NN</div>' : ''}
+            <div class="cn ${c.pk || isFk ? 'pk' : ''}">${esc(c.name)}</div><div class="ty">${esc(c.ty)}</div>${isFk ? '<div class="fk-badge">FK</div>' : ''}${c.not_null ? '<div class="nn">NN</div>' : ''}
             <div class="port" data-port="1" data-table="${esc(t.name)}" data-col="${esc(c.name)}"></div></div>`;
         })
         .join('');
@@ -627,8 +637,9 @@ export class Workbench {
     const d = this.drag;
     if (d?.kind === 'cards') return `Movendo ${this.selection.join(', ')}`;
     if (d?.kind === 'group') return `Movendo o grupo ${d.name}`;
-    if (d?.kind === 'link') return `Relação a partir de ${d.table}.${d.col}: solte sobre a coluna de destino`;
+    if (d?.kind === 'link') return `Relação a partir de ${d.table}.${d.col}: solte sobre a tabela de destino`;
     if (d?.kind === 'marquee') return 'Solte para selecionar as tabelas dentro do retângulo';
+    if (this.selectedRef) return 'Relação selecionada · Delete exclui a linha e a coluna FK · Esc limpa a seleção';
     if (this.selection.length > 1) return `${this.selection.length} tabelas selecionadas · Ctrl+G agrupa`;
     if (this.selection.length === 1) return `${this.selection[0]} · F2 renomeia · Del exclui`;
     return 'Clique numa tabela para ver detalhes · arraste o fundo para selecionar · roda para mover · Ctrl+roda para zoom';
@@ -730,16 +741,20 @@ export class Workbench {
     const sw = TABLE_COLORS.map(([l, h]) => `<button class="${cur === h ? 'on' : ''}" title="${l}" style="background:${h}" data-act="set-color" data-table="${esc(t.name)}" data-color="${h}"></button>`).join('') +
       `<button class="none" title="Sem cor" data-act="set-color" data-table="${esc(t.name)}" data-color="">${ICON('X', 12)}</button>`;
     const tw = this.prefs.colTypeW;
-    const cols = t.columns.map((c) => `<div class="crow">
+    const fkSet = new Set(this.scene?.tables.find((x) => x.name === t.name)?.fk_columns || []);
+    const cols = t.columns.map((c) => {
+      const isFk = !!c.fk || fkSet.has(c.name);
+      return `<div class="crow">
         <div class="n"><input class="fld" data-edit="colname" data-table="${esc(t.name)}" data-col="${esc(c.name)}" data-orig="${esc(c.name)}" value="${esc(c.name)}"></div>
         <div class="split" data-split="1"></div>
         <div class="t" style="width:${tw}px"><input class="fld muted" data-edit="coltype" data-table="${esc(t.name)}" data-col="${esc(c.name)}" data-orig="${esc(c.ty)}" value="${esc(c.ty)}"></div>
-        ${[['PK', 'pk', c.pk], ['NN', 'not null', c.not_null], ['UQ', 'unique', c.unique]]
+        ${[['PK', 'pk', c.pk], ['FK', 'fk', isFk], ['NN', 'not null', c.not_null], ['UQ', 'unique', c.unique]]
           .map(([l, f, on]) => `<button class="chip ${on ? 'on' : ''}" data-act="toggle-flag" data-table="${esc(t.name)}" data-col="${esc(c.name)}" data-flag="${f}" data-on="${on ? 1 : 0}">${l}</button>`).join('')}
-        <button class="del" data-act="del-col" data-table="${esc(t.name)}" data-col="${esc(c.name)}" title="Excluir coluna">${ICON('Trash', 13)}</button></div>`).join('');
+        <button class="del" data-act="del-col" data-table="${esc(t.name)}" data-col="${esc(c.name)}" title="Excluir coluna">${ICON('Trash', 13)}</button></div>`;
+    }).join('');
     const rels = refs.map((r) => {
       const card = { ManyToOne: 'N:1', OneToMany: '1:N', OneToOne: '1:1', ManyToMany: 'N:N' }[r.kind];
-      return `<div class="rel"><span style="color:var(--faint)">${ICON('Link2', 12)}</span><span class="tx">${esc(r.from.table)}.${esc(r.from.column)} → ${esc(r.to.table)}.${esc(r.to.column)}</span><span class="tag">${card}</span></div>`;
+      return `<div class="rel"><span style="color:var(--faint)">${ICON('Link2', 12)}</span><span class="tx">${esc(r.from.table)}.${esc(r.from.column)} → ${esc(r.to.table)}.${esc(r.to.column)}</span><span class="tag">${card}</span><button class="ib" style="width:22px;height:22px" data-act="del-ref" data-from-table="${esc(r.from.table)}" data-from-col="${esc(r.from.column)}" data-to-table="${esc(r.to.table)}" data-to-col="${esc(r.to.column)}" title="Excluir relação e coluna FK">${ICON('Trash', 12)}</button></div>`;
     }).join('');
     el.innerHTML = `
       <div class="ihead"><span class="eb">TABELA</span>
@@ -836,7 +851,7 @@ export class Workbench {
       }
       case 'ToolSelect': this.tool = 'select'; break;
       case 'ToolHand': this.tool = 'hand'; break;
-      case 'Deselect': this.selection = []; break;
+      case 'Deselect': this.selection = []; this.selectedRef = null; break;
       case 'ToggleCardTransparency': this.prefs.translucent = !this.prefs.translucent; break;
       case 'GroupSelection':
         if (this.selection.length) this.dispatch({ action: 'group_tables', payload: { tables: [...this.selection] } });
@@ -846,7 +861,10 @@ export class Workbench {
         return;
       case 'NewTable': this.dispatch({ action: 'add_table', payload: {} }); return;
       case 'DeleteSelection':
-        if (this.selection.length) {
+        if (this.selectedRef) {
+          this.dispatch({ action: 'delete_ref', payload: { ...this.selectedRef } });
+          this.selectedRef = null;
+        } else if (this.selection.length) {
           this.dispatch({ action: 'delete_tables', payload: { names: [...this.selection] } });
           this.selection = [];
         }
@@ -1112,7 +1130,23 @@ export class Workbench {
         this.dispatch({ action: 'set_table_color', payload: { table: d.table!, color: d.color || null } });
         return;
       case 'toggle-flag':
+        if (d.flag === 'fk' && d.on === '1') {
+          const ref = this.schema.refs.find((r) => r.from.table === d.table! && r.from.column === d.col!);
+          if (ref) {
+            this.dispatch({
+              action: 'delete_ref',
+              payload: { from_table: ref.from.table, from_col: ref.from.column, to_table: ref.to.table, to_col: ref.to.column },
+            });
+            return;
+          }
+        }
         this.dispatch({ action: 'set_column_flag', payload: { table: d.table!, column: d.col!, flag: d.flag!, value: d.on !== '1' } });
+        return;
+      case 'del-ref':
+        this.dispatch({
+          action: 'delete_ref',
+          payload: { from_table: d.fromTable!, from_col: d.fromCol!, to_table: d.toTable!, to_col: d.toCol! },
+        });
         return;
       case 'del-col':
         this.dispatch({ action: 'delete_column', payload: { table: d.table!, column: d.col! } });
@@ -1187,8 +1221,21 @@ export class Workbench {
     }
     if (e.button !== 0) return;
     const wp = this.toWorld(e);
+    const edgeHit = t.closest('[data-edge]') as HTMLElement | null;
+    if (edgeHit) {
+      this.selection = [];
+      this.selectedRef = {
+        from_table: edgeHit.dataset.fromTable!,
+        from_col: edgeHit.dataset.fromCol!,
+        to_table: edgeHit.dataset.toTable!,
+        to_col: edgeHit.dataset.toCol!,
+      };
+      this.scheduleRender();
+      return;
+    }
     const port = t.closest('[data-port]') as HTMLElement | null;
     if (port) {
+      this.selectedRef = null;
       this.drag = { kind: 'link', table: port.dataset.table!, col: port.dataset.col!, now: wp };
       e.preventDefault();
       this.scheduleRender();
@@ -1196,18 +1243,21 @@ export class Workbench {
     }
     const plus = t.closest('[data-addcol]') as HTMLElement | null;
     if (plus) {
+      this.selectedRef = null;
       this.selection = [plus.dataset.addcol!];
       this.dispatch({ action: 'add_column', payload: { table: plus.dataset.addcol! } });
       return;
     }
     const gl = t.closest('[data-group]') as HTMLElement | null;
     if (gl) {
+      this.selectedRef = null;
       this.drag = { kind: 'group', name: gl.dataset.group!, last: wp };
       this.scheduleRender();
       return;
     }
     const card = t.closest('.card') as HTMLElement | null;
     if (card) {
+      this.selectedRef = null;
       const name = card.dataset.table!;
       if (e.shiftKey) {
         this.selection = this.selection.includes(name) ? this.selection.filter((n) => n !== name) : [...this.selection, name];
@@ -1224,6 +1274,7 @@ export class Workbench {
       this.scheduleRender();
       return;
     }
+    this.selectedRef = null;
     const base = e.shiftKey ? [...this.selection] : [];
     this.selection = base;
     this.drag = { kind: 'marquee', start: wp, now: wp, base };
@@ -1297,9 +1348,13 @@ export class Workbench {
       }
     } else if (d.kind === 'link') {
       const el = document.elementFromPoint(this.lastMouse.x, this.lastMouse.y) as HTMLElement | null;
-      const row = el?.closest('[data-col]') as HTMLElement | null;
-      if (row && row.dataset.table && !(row.dataset.table === d.table && row.dataset.col === d.col)) {
-        this.dispatch({ action: 'add_ref', payload: { from_table: d.table, from_col: d.col, to_table: row.dataset.table, to_col: row.dataset.col! } });
+      const targetCard = el?.closest('.card') as HTMLElement | null;
+      const targetTable = targetCard?.dataset.table;
+      if (targetTable && targetTable !== d.table) {
+        this.dispatch({
+          action: 'add_ref',
+          payload: { from_table: d.table, from_col: d.col, to_table: targetTable, to_col: 'id' },
+        });
       }
     } else {
       this.queueSaveLayout();

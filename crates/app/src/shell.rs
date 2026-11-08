@@ -332,7 +332,7 @@ impl Shell {
                 DiagramEvent::CreateRef { from, to } => {
                     let (f, t) = (from.clone(), to.clone());
                     this.edit_text(false, window, cx, |text| {
-                        Some(dbml_edit::add_ref(text, (&f.0, &f.1), (&t.0, &t.1)))
+                        Some(dbml_edit::link_tables(text, &f.0, &t.0))
                     });
                 }
                 DiagramEvent::AddColumn(table) => this.add_column_to(table.clone(), window, cx),
@@ -833,6 +833,13 @@ impl Shell {
         cx: &mut Context<Self>,
     ) {
         let Some(doc) = self.doc() else { return };
+        if let Some((from, to)) = doc.diagram.read(cx).selected_ref().cloned() {
+            self.edit_text(false, window, cx, |t| {
+                Some(dbml_edit::delete_ref(t, (&from.0, &from.1), (&to.0, &to.1)))
+            });
+            self.with_diagram(cx, |d| d.deselect());
+            return;
+        }
         let names = doc.diagram.read(cx).selection();
         if names.is_empty() {
             return;
@@ -864,6 +871,25 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if flag == "fk" && !on {
+            // Desligar FK remove a relação (e a coluna FK vinculada)
+            if let Some(doc) = self.doc() {
+                let target_ref = doc
+                    .diagram
+                    .read(cx)
+                    .schema()
+                    .refs
+                    .iter()
+                    .find(|r| r.from.table == table && r.from.column == col)
+                    .map(|r| (r.to.table.clone(), r.to.column.clone()));
+                if let Some((to_t, to_c)) = target_ref {
+                    self.edit_text(false, window, cx, |t| {
+                        Some(dbml_edit::delete_ref(t, (&table, &col), (&to_t, &to_c)))
+                    });
+                    return;
+                }
+            }
+        }
         self.edit_text(false, window, cx, |t| {
             dbml_edit::set_column_flag(t, &table, &col, flag, on)
         });
@@ -2409,6 +2435,7 @@ impl Shell {
                         .tooltip(move |window, cx| {
                             Tooltip::new(match flag {
                                 "pk" => "Chave primária",
+                                "fk" => "Chave estrangeira (FK)",
                                 "not null" => "Obrigatória (not null)",
                                 _ => "Valor único",
                             })
@@ -2501,6 +2528,7 @@ impl Shell {
                                 .child(type_el),
                         )
                         .child(chip(format!("pk-{}", c.name), "PK", "pk", c.pk, cx))
+                        .child(chip(format!("fk-{}", c.name), "FK", "fk", c.fk, cx))
                         .child(chip(
                             format!("nn-{}", c.name),
                             "NN",
@@ -2666,15 +2694,18 @@ impl Shell {
                 );
             let title_el = field(EditTarget::Table(t.name.clone()), t.name.clone(), false, cx);
             let mut rels = div().flex().flex_col().gap(px(4.)).px(SP_MD);
-            for r in refs {
+            for (ri, r) in refs.iter().enumerate() {
                 let card = match r.kind {
                     schema::RefKind::ManyToOne => "N:1",
                     schema::RefKind::OneToMany => "1:N",
                     schema::RefKind::OneToOne => "1:1",
                     schema::RefKind::ManyToMany => "N:N",
                 };
+                let (ft, fc) = (r.from.table.clone(), r.from.column.clone());
+                let (tt, tc) = (r.to.table.clone(), r.to.column.clone());
                 rels = rels.child(
                     div()
+                        .group("insp-rel")
                         .flex()
                         .items_center()
                         .gap(px(6.))
@@ -2685,7 +2716,20 @@ impl Shell {
                             "{}.{} → {}.{}",
                             r.from.table, r.from.column, r.to.table, r.to.column
                         )))
-                        .child(tag(card)),
+                        .child(tag(card))
+                        .child(
+                            Button::new(SharedString::from(format!("del-rel-{ri}")))
+                                .ghost()
+                                .xsmall()
+                                .icon(IconName::Trash)
+                                .tooltip("Excluir relação e coluna FK")
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    let (f, t) = ((ft.clone(), fc.clone()), (tt.clone(), tc.clone()));
+                                    this.edit_text(false, window, cx, |text| {
+                                        Some(dbml_edit::delete_ref(text, (&f.0, &f.1), (&t.0, &t.1)))
+                                    });
+                                })),
+                        ),
                 );
             }
             // cor: amostras clicáveis (grava headercolor no DBML)

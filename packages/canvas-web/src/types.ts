@@ -20,6 +20,7 @@ export interface Column {
   name: string;
   ty: string;
   pk: boolean;
+  fk?: boolean;
   not_null: boolean;
   unique: boolean;
 }
@@ -149,7 +150,8 @@ export type Command =
   | { action: 'rename_column'; payload: { table: string; old_name: string; new_name: string } }
   | { action: 'set_column_type'; payload: { table: string; column: string; ty: string } }
   | { action: 'set_column_flag'; payload: { table: string; column: string; flag: string; value: boolean } }
-  | { action: 'add_ref'; payload: { from_table: string; from_col: string; to_table: string; to_col: string } }
+  | { action: 'add_ref'; payload: { from_table: string; from_col?: string; to_table: string; to_col?: string } }
+  | { action: 'delete_ref'; payload: { from_table: string; from_col: string; to_table: string; to_col: string } }
   | { action: 'group_tables'; payload: { name?: string; tables: string[] } }
   | { action: 'ungroup_table'; payload: { table: string } }
   | { action: 'ungroup_tables'; payload: { tables: string[] } }

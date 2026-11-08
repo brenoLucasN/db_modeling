@@ -538,10 +538,16 @@ pub fn apply_command(source: &str, command_js: JsValue) -> Result<JsValue, JsVal
         })?,
         Command::AddRef {
             from_table,
+            from_col: _,
+            to_table,
+            to_col: _,
+        } => dbml_edit::link_tables(source, &from_table, &to_table),
+        Command::DeleteRef {
+            from_table,
             from_col,
             to_table,
             to_col,
-        } => dbml_edit::add_ref(source, (&from_table, &from_col), (&to_table, &to_col)),
+        } => dbml_edit::delete_ref(source, (&from_table, &from_col), (&to_table, &to_col)),
         Command::GroupTables { name, tables } => {
             should_relayout = true;
             let group_name = name.unwrap_or_else(|| dbml_edit::next_group_name(source));

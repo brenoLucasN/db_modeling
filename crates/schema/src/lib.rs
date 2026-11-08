@@ -30,6 +30,8 @@ pub struct Column {
     pub name: String,
     pub ty: String,
     pub pk: bool,
+    #[serde(default)]
+    pub fk: bool,
     pub not_null: bool,
     pub unique: bool,
 }

@@ -24,6 +24,19 @@ pub fn analyze(text: &str) -> Schema {
             _ => {}
         }
     }
+    // Marca `fk = true` em toda coluna que é origem (`from`) de uma `Ref`
+    let fk_cols: std::collections::HashSet<(String, String)> = schema
+        .refs
+        .iter()
+        .map(|r| (r.from.table.clone(), r.from.column.clone()))
+        .collect();
+    for t in &mut schema.tables {
+        for c in &mut t.columns {
+            if fk_cols.contains(&(t.name.clone(), c.name.clone())) {
+                c.fk = true;
+            }
+        }
+    }
     schema
 }
 
@@ -94,7 +107,7 @@ fn column(node: &SyntaxNode, table: &str, refs: &mut Vec<Ref>) -> Option<Column>
         ty.push_str(toks[i].text());
         i += 1;
     }
-    let (mut pk, mut not_null, mut unique) = (false, false, false);
+    let (mut pk, mut fk, mut not_null, mut unique) = (false, false, false, false);
     if i < toks.len() {
         // configurações separadas por vírgula dentro de [...]
         let settings = &toks[i + 1..];
@@ -103,6 +116,7 @@ fn column(node: &SyntaxNode, table: &str, refs: &mut Vec<Ref>) -> Option<Column>
             let w = settings[j].text().to_ascii_lowercase();
             match w.as_str() {
                 "pk" | "primary" => pk = true,
+                "fk" => fk = true,
                 "unique" => unique = true,
                 "not"
                     if settings
@@ -112,6 +126,7 @@ fn column(node: &SyntaxNode, table: &str, refs: &mut Vec<Ref>) -> Option<Column>
                     not_null = true
                 }
                 "ref" => {
+                    fk = true;
                     // ref: > tabela.coluna
                     let rest: Vec<&str> = settings[j + 1..]
                         .iter()
@@ -139,6 +154,7 @@ fn column(node: &SyntaxNode, table: &str, refs: &mut Vec<Ref>) -> Option<Column>
         name,
         ty,
         pk,
+        fk,
         not_null,
         unique,
     })
