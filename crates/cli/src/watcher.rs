@@ -18,7 +18,10 @@ pub fn start_file_watcher(state: AppState) -> anyhow::Result<()> {
         };
 
         if let Err(e) = watcher.watch(&file_path, RecursiveMode::NonRecursive) {
-            eprintln!("Aviso: Falha ao monitorar arquivo '{}': {e}", file_path.display());
+            eprintln!(
+                "Aviso: Falha ao monitorar arquivo '{}': {e}",
+                file_path.display()
+            );
             return;
         }
 
@@ -58,7 +61,9 @@ pub fn start_file_watcher(state: AppState) -> anyhow::Result<()> {
                                 .to_string();
 
                                 let _ = state.tx.send(msg);
-                                println!("  [sync] Alteração externa detectada e propagada para o navegador.");
+                                println!(
+                                    "  [sync] Alteração externa detectada e propagada para o navegador."
+                                );
                             }
                         });
                     }

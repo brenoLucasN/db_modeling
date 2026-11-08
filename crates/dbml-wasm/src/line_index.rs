@@ -122,11 +122,7 @@ impl LineIndex {
         }
 
         let line_start = self.line_starts[line];
-        let next_line_start = self
-            .line_starts
-            .get(line + 1)
-            .copied()
-            .unwrap_or(self.len);
+        let next_line_start = self.line_starts.get(line + 1).copied().unwrap_or(self.len);
 
         let line_text = &text[line_start..next_line_start];
         let mut cur_utf16 = 0u32;
@@ -162,10 +158,22 @@ mod tests {
         let idx = LineIndex::new(text);
 
         assert_eq!(idx.line_ending(), LineEnding::Lf);
-        assert_eq!(idx.offset_to_position(text, 0), Position { line: 0, character: 0 });
+        assert_eq!(
+            idx.offset_to_position(text, 0),
+            Position {
+                line: 0,
+                character: 0
+            }
+        );
         // Na segunda linha: "  id int"
         let pos = idx.offset_to_position(text, 14); // logo após a quebra de linha
-        assert_eq!(pos, Position { line: 1, character: 0 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 1,
+                character: 0
+            }
+        );
     }
 
     #[test]

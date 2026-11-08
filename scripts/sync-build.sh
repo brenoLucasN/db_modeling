@@ -60,11 +60,12 @@ echo "==> [4/5] Sincronizando e compilando Extensão VS Code (vscode-extension).
     fi
 )
 
-echo "==> [5/5] Verificando integridade do workspace Rust (Desktop GPUI + CLI)..."
+echo "==> [5/5] Formatando, verificando clippy e rodando testes do workspace Rust..."
+cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 if [ "$DO_RELEASE" = true ]; then
     cargo build --release -p app -p dbml-cli
-else
-    cargo check --workspace
 fi
 
 echo "✓ Sincronização concluída! Desktop (app), CLI Web (dbml-cli) e VS Code estão alinhados."

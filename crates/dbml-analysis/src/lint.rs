@@ -46,14 +46,70 @@ const KNOWN_TOP: [&str; 5] = ["enum", "project", "tablegroup", "note", "records"
 
 /// Catálogo de tipos de dados SQL/DBML reconhecidos.
 const KNOWN_TYPES: &[&str] = &[
-    "int", "integer", "tinyint", "smallint", "mediumint", "bigint", "int2", "int4", "int8",
-    "serial", "smallserial", "bigserial", "decimal", "numeric", "real", "float", "float4",
-    "float8", "double", "money", "varchar", "char", "character", "nvarchar", "nchar", "text",
-    "tinytext", "mediumtext", "longtext", "clob", "uuid", "boolean", "bool", "bit", "date",
-    "datetime", "datetime2", "smalldatetime", "time", "timetz", "timestamp", "timestamptz",
-    "interval", "year", "json", "jsonb", "xml", "bytea", "blob", "binary", "varbinary", "inet",
-    "cidr", "macaddr", "point", "line", "polygon", "geometry", "geography", "tsvector", "tsquery",
-    "array", "enum", "set",
+    "int",
+    "integer",
+    "tinyint",
+    "smallint",
+    "mediumint",
+    "bigint",
+    "int2",
+    "int4",
+    "int8",
+    "serial",
+    "smallserial",
+    "bigserial",
+    "decimal",
+    "numeric",
+    "real",
+    "float",
+    "float4",
+    "float8",
+    "double",
+    "money",
+    "varchar",
+    "char",
+    "character",
+    "nvarchar",
+    "nchar",
+    "text",
+    "tinytext",
+    "mediumtext",
+    "longtext",
+    "clob",
+    "uuid",
+    "boolean",
+    "bool",
+    "bit",
+    "date",
+    "datetime",
+    "datetime2",
+    "smalldatetime",
+    "time",
+    "timetz",
+    "timestamp",
+    "timestamptz",
+    "interval",
+    "year",
+    "json",
+    "jsonb",
+    "xml",
+    "bytea",
+    "blob",
+    "binary",
+    "varbinary",
+    "inet",
+    "cidr",
+    "macaddr",
+    "point",
+    "line",
+    "polygon",
+    "geometry",
+    "geography",
+    "tsvector",
+    "tsquery",
+    "array",
+    "enum",
+    "set",
 ];
 
 fn levenshtein(a: &str, b: &str) -> usize {
@@ -163,7 +219,10 @@ fn check_column_type(
                     out.push(diag(
                         range(extra),
                         Severity::Error,
-                        format!("Token inesperado `{}` após o tipo da coluna `{cname}`", extra.text()),
+                        format!(
+                            "Token inesperado `{}` após o tipo da coluna `{cname}`",
+                            extra.text()
+                        ),
                     ));
                 }
             }
@@ -202,7 +261,10 @@ fn check_column_settings(
     open_idx: usize,
     out: &mut Vec<Diagnostic>,
 ) {
-    let Some(close_rel) = ct[open_idx..].iter().position(|k| k.kind() == SyntaxKind::RBracket) else {
+    let Some(close_rel) = ct[open_idx..]
+        .iter()
+        .position(|k| k.kind() == SyntaxKind::RBracket)
+    else {
         out.push(diag(
             range(&ct[open_idx]),
             Severity::Error,
@@ -250,7 +312,10 @@ fn check_column_settings(
                     out.push(diag(
                         range(extra),
                         Severity::Error,
-                        format!("Token inesperado `{}` após `{kw}` (use vírgula para separar opções)", extra.text()),
+                        format!(
+                            "Token inesperado `{}` após `{kw}` (use vírgula para separar opções)",
+                            extra.text()
+                        ),
                     ));
                 }
             }
@@ -467,8 +532,8 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
             op_idx += 1;
         }
         let has_op = op_idx > 3;
-        let has_dot2 = body.get(op_idx + 1).is_some_and(|k| k.text() == ".")
-            && body.get(op_idx + 2).is_some();
+        let has_dot2 =
+            body.get(op_idx + 1).is_some_and(|k| k.text() == ".") && body.get(op_idx + 2).is_some();
         if !has_dot1 || !has_op || !has_dot2 {
             out.push(diag(
                 range(&ts[0]),
@@ -525,12 +590,14 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
             .collect();
         let Some(gname_tok) = head
             .iter()
-            .find(|k| {
-                k.kind() != SyntaxKind::Ident || !k.text().eq_ignore_ascii_case("tablegroup")
-            })
+            .find(|k| k.kind() != SyntaxKind::Ident || !k.text().eq_ignore_ascii_case("tablegroup"))
             .filter(|k| matches!(k.kind(), SyntaxKind::Ident | SyntaxKind::Str))
         else {
-            out.push(diag(range(&toks[0]), Severity::Error, "Grupo (`TableGroup`) sem nome"));
+            out.push(diag(
+                range(&toks[0]),
+                Severity::Error,
+                "Grupo (`TableGroup`) sem nome",
+            ));
             continue;
         };
         let gname = unquote(gname_tok.text());
@@ -656,7 +723,11 @@ mod tests {
         let m = msgs(src);
         assert!(m.iter().any(|s| s.contains("conflitantes")), "{m:?}");
         assert!(m.iter().any(|s| s.contains("Parâmetros vazios")), "{m:?}");
-        assert!(m.iter().any(|s| s.contains("Configuração desconhecida `uniq`")), "{m:?}");
+        assert!(
+            m.iter()
+                .any(|s| s.contains("Configuração desconhecida `uniq`")),
+            "{m:?}"
+        );
         assert!(m.iter().any(|s| s.contains("exige um valor")), "{m:?}");
     }
 
@@ -665,6 +736,9 @@ mod tests {
         let src = "Table a {\n  id int [pk]\n}\nTable b {\n  id int [pk]\n  a_id text\n}\nRef: b.a_id > a.id\nRef: a.id > a.id\n";
         let m = msgs(src);
         assert!(m.iter().any(|s| s.contains("Tipos incompatíveis")), "{m:?}");
-        assert!(m.iter().any(|s| s.contains("referenciar a si mesma")), "{m:?}");
+        assert!(
+            m.iter().any(|s| s.contains("referenciar a si mesma")),
+            "{m:?}"
+        );
     }
 }

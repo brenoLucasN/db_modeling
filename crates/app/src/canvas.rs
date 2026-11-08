@@ -73,6 +73,8 @@ enum Drag {
     },
 }
 
+pub type RefPair = ((String, String), (String, String));
+
 pub struct Diagram {
     schema: Schema,
     /// Posição de mundo por nome de tabela (sobrevive a reparse).
@@ -86,7 +88,7 @@ pub struct Diagram {
     top: Option<String>,
     selected: Option<String>,
     /// relação selecionada no canvas `((from_table, from_col), (to_table, to_col))`
-    selected_ref: Option<((String, String), (String, String))>,
+    selected_ref: Option<RefPair>,
     /// seleção extra (Shift+clique); a seleção total é `selected` + `multi`
     multi: Vec<String>,
     pub tool: Tool,
@@ -236,7 +238,7 @@ impl Diagram {
         }
     }
 
-    pub fn selected_ref(&self) -> Option<&((String, String), (String, String))> {
+    pub fn selected_ref(&self) -> Option<&RefPair> {
         self.selected_ref.as_ref()
     }
 
@@ -324,7 +326,7 @@ impl Diagram {
     }
 
     /// Relação (`Ref`) sob o ponto (mundo), verificando distância até os segmentos ortogonais.
-    fn ref_at(&self, p: (f32, f32)) -> Option<((String, String), (String, String))> {
+    fn ref_at(&self, p: (f32, f32)) -> Option<RefPair> {
         let schema = &self.schema;
         for r in &schema.refs {
             let Some(ft) = schema.table(&r.from.table) else {
@@ -625,9 +627,8 @@ impl Diagram {
                         && t.0 == r.to.table
                         && t.1 == r.to.column
                 });
-                let lit = is_sel_ref
-                    || self.is_selected(&r.from.table)
-                    || self.is_selected(&r.to.table);
+                let lit =
+                    is_sel_ref || self.is_selected(&r.from.table) || self.is_selected(&r.to.table);
                 Some(Edge {
                     a: point(px(ax * z + pan_x), px(ay * z + pan_y)),
                     b: point(px(bx * z + pan_x), px(by * z + pan_y)),
