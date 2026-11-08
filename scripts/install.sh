@@ -29,7 +29,8 @@ if [ "${1:-}" = "--uninstall" ] || [ "${1:-}" = "-u" ]; then
     if [ "$(uname -s)" = "Darwin" ]; then
         if [ -d "/Applications/DB Modeling.app" ]; then
             sudo rm -rf "/Applications/DB Modeling.app"
-            echo -e "${GREEN}✓ ${DISPLAY_NAME} desinstalado com sucesso do macOS.${RESET}"
+            sudo rm -f "/usr/local/bin/dbml" "/usr/local/bin/db-modeling"
+            echo -e "${GREEN}✓ ${DISPLAY_NAME} e CLI (dbml) desinstalados com sucesso do macOS.${RESET}"
         else
             echo "O aplicativo não foi encontrado em /Applications."
         fi
@@ -131,4 +132,6 @@ case "$OS" in
 esac
 
 echo ""
-echo -e "${BOLD}Você já pode abrir o ${DISPLAY_NAME} pelo menu do seu sistema ou digitando: db-modeling${RESET}"
+echo -e "${BOLD}Você já pode abrir o ${DISPLAY_NAME} pelo menu do seu sistema ou digitando:${RESET}"
+echo -e "  • App Desktop:      ${GREEN}db-modeling${RESET}"
+echo -e "  • CLI Web Server:   ${GREEN}dbml run schema.dbml${RESET}"

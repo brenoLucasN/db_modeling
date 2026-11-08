@@ -10,17 +10,23 @@ mkdir -p "$DISTDIR"
 
 MODE="${1:-release}"
 if [ "$MODE" = "debug" ]; then
-    echo "==> Compilando DB Modeling v$VERSION para Windows (modo debug)..."
-    cargo xwin build -p app --target x86_64-pc-windows-msvc
+    echo "==> Compilando DB Modeling v$VERSION para Windows (App + CLI em modo debug)..."
+    cargo xwin build -p app -p dbml-cli --target x86_64-pc-windows-msvc
     EXE_SRC="target/x86_64-pc-windows-msvc/debug/app.exe"
+    CLI_SRC="target/x86_64-pc-windows-msvc/debug/dbml.exe"
 else
-    echo "==> Compilando DB Modeling v$VERSION para Windows (modo release)..."
-    cargo xwin build --release -p app --target x86_64-pc-windows-msvc
+    echo "==> Compilando DB Modeling v$VERSION para Windows (App + CLI em modo release)..."
+    cargo xwin build --release -p app -p dbml-cli --target x86_64-pc-windows-msvc
     EXE_SRC="target/x86_64-pc-windows-msvc/release/app.exe"
+    CLI_SRC="target/x86_64-pc-windows-msvc/release/dbml.exe"
 fi
 
 EXE_DIST="$DISTDIR/${NAME}-v${VERSION}-x86_64.exe"
+CLI_DIST="$DISTDIR/dbml-v${VERSION}-x86_64.exe"
 cp "$EXE_SRC" "$EXE_DIST"
+if [ -f "$CLI_SRC" ]; then
+    cp "$CLI_SRC" "$CLI_DIST"
+fi
 
 echo ""
 echo "=========================================================="

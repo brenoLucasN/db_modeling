@@ -1,0 +1,48 @@
+// Exemplo: e-commerce simples
+Table users [headercolor: #8b5cf6] {
+  id int [pk]
+  email varchar(255) [unique, not null]
+  name text
+  created_at timestamp
+}
+
+Table products {
+  id int [pk]
+  title varchar(200) [not null]
+  price decimal(10,2)
+  stock int
+}
+
+Table orders {
+  id int [pk]
+  user_id int [ref: > users.id, not null]
+  status varchar(20)
+  placed_at timestamp
+}
+
+Table order_items {
+  id int [pk]
+  order_id int [ref: > orders.id]
+  product_id int [ref: > products.id]
+  quantity int
+}
+
+Table reviews {
+  id int [pk]
+  product_id int
+  user_id int
+  rating int
+}
+
+Ref: reviews.product_id > products.id
+Ref: reviews.user_id > users.id
+
+TableGroup vendas [color: #3b82f6] {
+  orders
+  order_items
+}
+
+TableGroup catalogo [color: #22c55e] {
+  products
+  reviews
+}

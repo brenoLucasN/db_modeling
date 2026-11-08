@@ -85,6 +85,8 @@ pub struct Diagram {
     /// Último cartão tocado; desenhado por cima dos demais.
     top: Option<String>,
     selected: Option<String>,
+    /// relação selecionada no canvas `((from_table, from_col), (to_table, to_col))`
+    selected_ref: Option<((String, String), (String, String))>,
     /// seleção extra (Shift+clique); a seleção total é `selected` + `multi`
     multi: Vec<String>,
     pub tool: Tool,
@@ -110,6 +112,7 @@ impl Diagram {
             drag: None,
             top: None,
             selected: None,
+            selected_ref: None,
             multi: Vec::new(),
             tool: Tool::Select,
             space: false,
@@ -202,6 +205,10 @@ impl Diagram {
                     self.multi.len() + 1
                 )
             }
+            (None, Tool::Select) if self.selected_ref.is_some() => {
+                "Relação selecionada · Delete exclui a linha e a coluna FK · Esc limpa a seleção"
+                    .into()
+            }
             (None, Tool::Select) if self.selected.is_some() => {
                 "Arraste para mover a tabela · Esc limpa a seleção".into()
             }
@@ -224,13 +231,19 @@ impl Diagram {
     pub fn select(&mut self, name: &str) {
         if self.schema.table(name).is_some() {
             self.selected = Some(name.to_string());
+            self.selected_ref = None;
             self.multi.clear();
         }
+    }
+
+    pub fn selected_ref(&self) -> Option<&((String, String), (String, String))> {
+        self.selected_ref.as_ref()
     }
 
     pub fn deselect(&mut self) {
         self.multi.clear();
         self.selected = None;
+        self.selected_ref = None;
     }
 
     pub fn zoom_by(&mut self, factor: f32) {
@@ -290,6 +303,102 @@ impl Diagram {
         })
     }
 
+    /// Tabela sob o ponto (mundo), para soltar uma relação em qualquer parte do cartão.
+    fn table_at(&self, p: (f32, f32)) -> Option<(String, String)> {
+        self.schema.tables.iter().find_map(|t| {
+            let (x, y) = self.pos[&t.name];
+            let inside =
+                p.0 >= x && p.0 <= x + CARD_W && p.1 >= y && p.1 <= y + card_h(t.columns.len());
+            if !inside {
+                return None;
+            }
+            let pk_col = t
+                .columns
+                .iter()
+                .find(|c| c.pk)
+                .or_else(|| t.columns.first())
+                .map(|c| c.name.clone())
+                .unwrap_or_else(|| "id".to_string());
+            Some((t.name.clone(), pk_col))
+        })
+    }
+
+    /// Relação (`Ref`) sob o ponto (mundo), verificando distância até os segmentos ortogonais.
+    fn ref_at(&self, p: (f32, f32)) -> Option<((String, String), (String, String))> {
+        let schema = &self.schema;
+        for r in &schema.refs {
+            let Some(ft) = schema.table(&r.from.table) else {
+                continue;
+            };
+            let Some(tt) = schema.table(&r.to.table) else {
+                continue;
+            };
+            let Some(fc) = ft.columns.iter().position(|c| c.name == r.from.column) else {
+                continue;
+            };
+            let Some(tc) = tt.columns.iter().position(|c| c.name == r.to.column) else {
+                continue;
+            };
+            let (ax, ay) = self.pos[&ft.name];
+            let (bx, by) = self.pos[&tt.name];
+            let ay = ay + HEADER_H + 4. + ROW_H * (fc as f32 + 0.5);
+            let by = by + HEADER_H + 4. + ROW_H * (tc as f32 + 0.5);
+            let (sa, sb) = if ax + CARD_W < bx {
+                (1., -1.)
+            } else if bx + CARD_W < ax {
+                (-1., 1.)
+            } else {
+                (1., 1.)
+            };
+            let (ax, bx) = (
+                if sa > 0. { ax + CARD_W } else { ax },
+                if sb > 0. { bx + CARD_W } else { bx },
+            );
+            let obstacles: Vec<layout::Rect> = schema
+                .tables
+                .iter()
+                .filter(|t| t.name != ft.name && t.name != tt.name)
+                .map(|t| {
+                    let (x, y) = self.pos[&t.name];
+                    layout::Rect {
+                        x,
+                        y,
+                        w: CARD_W,
+                        h: card_h(t.columns.len()),
+                    }
+                })
+                .collect();
+            let pts = layout::route(
+                layout::Pos { x: ax, y: ay },
+                sa,
+                layout::Pos { x: bx, y: by },
+                sb,
+                &obstacles,
+                24.,
+            );
+            for w in pts.windows(2) {
+                let (a, b) = (w[0], w[1]);
+                let (dx, dy) = (b.x - a.x, b.y - a.y);
+                let l2 = dx * dx + dy * dy;
+                let t_proj = if l2 < 0.001 {
+                    0.
+                } else {
+                    ((p.0 - a.x) * dx + (p.1 - a.y) * dy) / l2
+                }
+                .clamp(0., 1.);
+                let (cx, cy) = (a.x + t_proj * dx, a.y + t_proj * dy);
+                let dist = ((p.0 - cx).powi(2) + (p.1 - cy).powi(2)).sqrt();
+                if dist <= 8. / self.zoom.max(0.4) {
+                    return Some((
+                        (r.from.table.clone(), r.from.column.clone()),
+                        (r.to.table.clone(), r.to.column.clone()),
+                    ));
+                }
+            }
+        }
+        None
+    }
+
     /// Posiciona uma tabela recém-criada no centro da vista e a seleciona.
     pub fn place_new(&mut self, name: &str) {
         let (w, h) = (f32::from(self.size.width), f32::from(self.size.height));
@@ -317,8 +426,8 @@ impl Diagram {
 
     fn end_drag(&mut self, cx: &mut Context<Self>) {
         if let Some(Drag::Link { from, now }) = &self.drag
-            && let Some(to) = self.column_at(*now)
-            && to != *from
+            && let Some(to) = self.column_at(*now).or_else(|| self.table_at(*now))
+            && to.0 != from.0
         {
             cx.emit(DiagramEvent::CreateRef {
                 from: from.clone(),
@@ -510,7 +619,15 @@ impl Diagram {
                     schema::RefKind::OneToOne => ("1", "1"),
                     schema::RefKind::ManyToMany => ("N", "N"),
                 };
-                let lit = self.is_selected(&r.from.table) || self.is_selected(&r.to.table);
+                let is_sel_ref = self.selected_ref.as_ref().is_some_and(|(f, t)| {
+                    f.0 == r.from.table
+                        && f.1 == r.from.column
+                        && t.0 == r.to.table
+                        && t.1 == r.to.column
+                });
+                let lit = is_sel_ref
+                    || self.is_selected(&r.from.table)
+                    || self.is_selected(&r.to.table);
                 Some(Edge {
                     a: point(px(ax * z + pan_x), px(ay * z + pan_y)),
                     b: point(px(bx * z + pan_x), px(by * z + pan_y)),
@@ -522,7 +639,7 @@ impl Diagram {
                 })
             })
             .collect();
-        let has_sel = sel.is_some() || !self.multi.is_empty();
+        let has_sel = sel.is_some() || !self.multi.is_empty() || self.selected_ref.is_some();
         let ink = g.text_muted;
         let labels: Vec<(Point<Pixels>, &'static str)> = edges
             .iter()
@@ -621,12 +738,20 @@ impl Diagram {
                     if this.tool == Tool::Hand || this.space {
                         this.drag = Some(Drag::Pan { last: e.position });
                     } else {
+                        let at = this.to_world(e.position);
+                        if let Some(hit_ref) = this.ref_at(at) {
+                            this.selected = None;
+                            this.multi.clear();
+                            this.selected_ref = Some(hit_ref);
+                            cx.notify();
+                            return;
+                        }
                         // arrastar no vazio = seleção por retângulo (Shift soma à seleção)
                         if !e.modifiers.shift {
                             this.selected = None;
+                            this.selected_ref = None;
                             this.multi.clear();
                         }
-                        let at = this.to_world(e.position);
                         this.drag = Some(Drag::Marquee { start: at, now: at });
                     }
                     cx.notify();
@@ -891,7 +1016,7 @@ impl Diagram {
                 });
             let mut rows: Vec<AnyElement> = Vec::new();
             for (i, c) in t.columns.iter().enumerate() {
-                let fk = fks.contains(&(t.name.as_str(), c.name.as_str()));
+                let fk = c.fk || fks.contains(&(t.name.as_str(), c.name.as_str()));
                 let icon = if c.pk {
                     Some(Icon::new(IconName::KeyRound).text_color(g.accent))
                 } else if fk {
@@ -929,7 +1054,7 @@ impl Diagram {
                                 .truncate()
                                 .text_size(s(13. * g.ui_scale))
                                 .text_color(g.text)
-                                .when(c.pk, |d| d.font_weight(FontWeight::MEDIUM))
+                                .when(c.pk || fk, |d| d.font_weight(FontWeight::MEDIUM))
                                 .child(c.name.clone()),
                         )
                         .child(
@@ -938,6 +1063,18 @@ impl Diagram {
                                 .text_color(g.text_muted)
                                 .child(c.ty.clone()),
                         )
+                        .when(fk, |d| {
+                            d.child(
+                                div()
+                                    .px(s(4.))
+                                    .rounded(s(3.))
+                                    .bg(g.selected)
+                                    .text_size(s(9.5 * g.ui_scale))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(g.accent)
+                                    .child("FK"),
+                            )
+                        })
                         .when(c.not_null, |d| {
                             d.child(
                                 div()
@@ -1395,6 +1532,14 @@ impl Diagram {
                 .child(row(
                     div().text_size(TEXT_XS).child("PK").into_any_element(),
                     "Chave primária",
+                ))
+                .child(row(
+                    div()
+                        .text_size(TEXT_XS)
+                        .text_color(g.accent)
+                        .child("FK")
+                        .into_any_element(),
+                    "Chave estrangeira (id_tabela)",
                 ))
                 .child(row(
                     div()

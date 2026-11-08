@@ -4,8 +4,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-echo "==> Compilando DB Modeling em modo release..."
-cargo build --release -p app
+echo "==> Compilando DB Modeling (App Desktop + CLI Web) em modo release..."
+cargo build --release -p app -p dbml-cli
 
 VERSION="$(cargo pkgid -p app | cut -d# -f2 | cut -d: -f2 2>/dev/null || sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
 NAME="db-modeling"
@@ -22,9 +22,10 @@ mkdir -p "$PKG_DIR"/usr/bin
 mkdir -p "$PKG_DIR"/usr/share/applications
 mkdir -p "$DISTDIR"
 
-# Binário e atalho desktop
+# Binários (App Desktop + CLI Web) e atalho desktop
 cp target/release/app "$PKG_DIR"/usr/bin/db-modeling
-chmod 0755 "$PKG_DIR"/usr/bin/db-modeling
+cp target/release/dbml "$PKG_DIR"/usr/bin/dbml
+chmod 0755 "$PKG_DIR"/usr/bin/db-modeling "$PKG_DIR"/usr/bin/dbml
 
 cat <<EOF > "$PKG_DIR/usr/share/applications/db-modeling.desktop"
 [Desktop Entry]

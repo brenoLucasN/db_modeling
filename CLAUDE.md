@@ -1,18 +1,30 @@
 # CLAUDE.md
 
-**DB Modeling** — app desktop de modelagem de banco de dados (estilo dbdiagram) em
-**Rust + GPUI**, para **Windows e Ubuntu**, com foco máximo em UI/UX e edição
+**DB Modeling** — ecossistema de modelagem de banco de dados (estilo dbdiagram) em
+**Rust + GPUI / Web / Wasm**, para **Windows, Linux (Ubuntu/Fedora) e macOS**, com foco máximo em UI/UX e edição
 bidirecional texto (DBML) ↔ canvas.
 
 ## Escopo
-- Dentro: modelagem visual + texto DBML; export **PNG, JPEG e Mermaid `erDiagram`**.
-- Fora: conexão/leitura de banco, export/import SQL, migrações, macOS.
-- Alvos: Windows 10/11, Ubuntu 22.04/24.04. App abre "canvas first".
-- Layout em sidecar JSON (`schema.dbml.layout.json`).
+- Dentro: modelagem visual + texto DBML; export **PNG, JPEG, SVG e Mermaid `erDiagram`**.
+- Modalidades:
+  1. **App Desktop Nativo (GPUI):** 120 fps, aceleração por GPU (DirectX/Vulkan/Metal).
+  2. **Extensão VS Code (`.vsix`):** Editor customizado com Webview Canvas e núcleo Wasm/CST local.
+  3. **CLI Web Server (`dbml run`):** Servidor HTTP/WebSocket local em Axum com auto-reload e sincronização contínua.
+- Alvos: Windows 10/11, Ubuntu 22.04/24.04, Fedora 40/41 e macOS (Apple Silicon e Intel).
+- Persistência: Texto DBML como fonte da verdade persistida + sidecar JSON (`<schema>.dbml.layout.json`).
 
 ## Status
-Fase 0/1 em andamento: workspace com `schema`, `dbml-syntax`, `dbml-analysis`, `dbml-edit`, `layout` e `app` (shell GPUI com canvas e editor ao vivo). Antes de implementar, ler `docs/` (índice no
-`README.md`). ADRs em `openspec/adr/` com `status: proposta` aguardam os spikes da Fase 0.
+Workspace multi-crate integrado e funcional:
+- `schema`: modelo semântico puro com `serde` habilitado.
+- `dbml-syntax` & `dbml-analysis`: CST Rowan sem perdas e linter semântico.
+- `dbml-edit`: patches textuais mínimos sobre o buffer.
+- `layout`: auto-layout em camadas (Sugiyama) e roteamento ortogonal de arestas.
+- `dbml-wasm`: compilação Wasm (`wasm32-unknown-unknown`) e ponte UTF-16 para VS Code.
+- `cli` (`dbml-cli`): utilitário CLI e servidor Axum/WebSocket local com assets embutidos.
+- `app`: aplicação desktop GPUI com canvas interativo e docking.
+- `packages/canvas-web`: motor interativo de Canvas 2D, pan/zoom, edição inline e testes em Vitest.
+- `vscode-extension`: extensão oficial VS Code (`CustomTextEditor` + Wasm bundle embutido).
+- Instaladores / Wizards: Windows Inno Setup (`.exe`), macOS (`.dmg`/`.pkg`), Debian/Ubuntu (`.deb`), Fedora (`.rpm`) e `scripts/install.sh`.
 
 ## Fluxo de trabalho
 **Prioridade: skills do `mattpocock-skills`.** Quando uma skill dele cobre o mesmo
@@ -55,37 +67,37 @@ resposta — ele não vê esta conversa.
 ## Agent skills
 
 ### Issue tracker
-
-Markdown local em `.scratch/<feature>/` (ainda sem repositório git remoto). Ver `docs/agents/issue-tracker.md`.
+Markdown local em `.scratch/<feature>/` (ver `docs/agents/issue-tracker.md`).
 
 ### Triage labels
-
 Os cinco papéis canônicos traduzidos (`precisa-triagem`, `precisa-info`, `pronto-para-agente`, `pronto-para-humano`, `nao-sera-feito`). Ver `docs/agents/triage-labels.md`.
 
 ### Domain docs
-
-Contexto único: `GLOSSARY.md` na raiz + ADRs em `openspec/adr/` (nunca `docs/adr/`, mesmo que a skill cite esse caminho). Ver `docs/agents/domain.md`.
+Contexto único: `GLOSSARY.md` na raiz + ADRs em `openspec/adr/` (nunca `docs/adr/`). Ver `docs/agents/domain.md`.
 
 ## Idioma
 **Tudo em português (pt-BR)**: conversa, docs, ADRs, glossário, specs, tickets em
-`.scratch/`, design docs, skills do projeto, mensagens de commit e descrições de PR — mesmo
-quando a skill (do Matt, OpenSpec ou outra) traz template ou exemplos em inglês: traduzir
-títulos e seções do template. Exceções: identificadores de código, nomes de crates/arquivos,
-comandos, e as palavras-chave que o parser do OpenSpec exige (`## ADDED Requirements`,
-`### Requirement:`, `#### Scenario:`, `SHALL`/`MUST`).
+`.scratch/`, design docs, skills do projeto, mensagens de commit e descrições de PR. Exceções: identificadores de código, nomes de crates/arquivos,
+comandos, e palavras-chave estruturais do OpenSpec.
 
 ## Princípios que não mudam sem discussão
 - DBML do usuário permanece **DBML válido**; metadados do app vão no sidecar de layout.
 - Edições da UI viram **patches textuais mínimos** (preservar comentários/formatação).
-- Só o crate `app` depende de GPUI; o núcleo é Rust puro e testável.
+- Núcleo desacoplado de UI; crates puras e testáveis headless.
 - Toda ação de UI: acessível por teclado, presente na command palette, sem modal, com undo.
+- **Sincronia obrigatória Desktop + CLI Web + VS Code:** Qualquer mudança em funcionalidades, comandos semânticos ou UX/UI deve ser sincronizada nas 3 modalidades (`crates/app`, `packages/canvas-web` + `crates/cli`, e `vscode-extension` + `crates/dbml-wasm`). Sempre rodar `./scripts/sync-build.sh` após alterações no núcleo ou no `packages/canvas-web`.
 
 ## Stack (fixar versões exatas)
-`gpui-kit` 0.8 (→ `gpui-pre` =0.3.9, `gpui-component` 0.8), `logos`, `rowan`,
-`petgraph`, `kurbo`, `resvg`, `image`, `insta`, `proptest`. Detalhes em `docs/04-stack.md`.
-A API do GPUI muda muito: consultar o código-fonte da versão fixada (docs.rs / repositório)
-em vez de confiar em exemplos antigos.
+- **Desktop:** `gpui-kit` =0.8.0 (→ `gpui-pre` =0.3.9, `gpui-component` =0.8.0), `logos` 0.16.1, `rowan` 0.17.0, `petgraph` 0.8.3, `kurbo` 0.13.1, `resvg` 0.48.1, `tiny-skia` 0.12.0.
+- **Web & Wasm:** `wasm-bindgen` 0.2.129, `serde-wasm-bindgen` 0.6, `axum` 0.8, `tokio` 1.x, `tokio-tungstenite` 0.29, `rust-embed` 8.x.
+- **Frontend:** TypeScript 5.7, Vite 6.x, Vitest 5.x, esbuild 0.25.
+- A API do GPUI muda muito: consultar o código-fonte da versão fixada (docs.rs / repositório) em vez de confiar em exemplos antigos.
 
-## Ambiente
-Desenvolvimento em WSL2 (Linux 6.18), rustc 1.99.1. Execução do GPUI em WSLg não validada
-(risco R1). Atalhos usam `Ctrl` (sem macOS).
+## Comandos Rápidos
+- Sincronizar Tudo (Wasm + Canvas Web + CLI + VS Code + Desktop): `./scripts/sync-build.sh` (`--package` para `.vsix`, `--release` para binários release)
+- Desktop: `cargo run -p app`
+- CLI Web: `cargo run -p dbml-cli -- run schema.dbml`
+- Testes Rust: `cargo test --workspace`
+- Testes Web Canvas: `cd packages/canvas-web && npm test`
+- Build Extensão VS Code: `cd vscode-extension && npm run build && npm run package`
+- Instalador Universal: `./scripts/install.sh`

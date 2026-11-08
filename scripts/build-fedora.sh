@@ -11,8 +11,8 @@ if ! command -v rpmbuild &>/dev/null; then
     exit 1
 fi
 
-echo "==> Compilando DB Modeling em modo release..."
-cargo build --release -p app
+echo "==> Compilando DB Modeling (App Desktop + CLI Web) em modo release..."
+cargo build --release -p app -p dbml-cli
 
 VERSION="$(cargo pkgid -p app | cut -d# -f2 | cut -d: -f2 2>/dev/null || sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
 NAME="db-modeling"
@@ -29,6 +29,7 @@ STAGE_DIR="$TOPDIR/SOURCES/${NAME}-${VERSION}"
 mkdir -p "$STAGE_DIR/icons"
 
 cp target/release/app "$STAGE_DIR/db-modeling"
+cp target/release/dbml "$STAGE_DIR/dbml"
 cp crates/app/assets/brand/icon-*.png "$STAGE_DIR/icons/"
 cp crates/app/assets/brand/icon.svg "$STAGE_DIR/icons/"
 
@@ -87,6 +88,7 @@ edição bidirecional texto (DBML) e canvas visual, escrito em Rust e GPUI.
 rm -rf %{buildroot}
 install -d -m 0755 %{buildroot}%{_bindir}
 install -m 0755 db-modeling %{buildroot}%{_bindir}/db-modeling
+install -m 0755 dbml %{buildroot}%{_bindir}/dbml
 
 install -d -m 0755 %{buildroot}%{_datadir}/applications
 install -m 0644 db-modeling.desktop %{buildroot}%{_datadir}/applications/db-modeling.desktop
@@ -101,6 +103,7 @@ install -m 0644 icons/icon.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/ap
 
 %files
 %{_bindir}/db-modeling
+%{_bindir}/dbml
 %{_datadir}/applications/db-modeling.desktop
 %{_datadir}/icons/hicolor/*/apps/db-modeling.png
 %{_datadir}/icons/hicolor/scalable/apps/db-modeling.svg

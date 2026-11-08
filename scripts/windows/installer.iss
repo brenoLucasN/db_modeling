@@ -54,10 +54,13 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "startmenuicon"; Description: "Criar atalho no Menu Iniciar"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "associate_dbml"; Description: "Associar arquivos DBML (.dbml) ao DB Modeling"; GroupDescription: "Associações de Arquivo:"
+Name: "addtopath"; Description: "Adicionar CLI (dbml) ao PATH do sistema (permite rodar 'dbml run schema.dbml')"; GroupDescription: "Ferramentas de Linha de Comando (CLI Web Server):"
 
 [Files]
-; Executável principal compilado pelo Cargo
+; Executável principal Desktop compilado pelo Cargo
 Source: "..\..\target\release\app.exe"; DestDir: "{app}"; DestName: "{#AppExeName}"; Flags: ignoreversion
+; Executável CLI Web Server (dbml.exe)
+Source: "..\..\target\release\dbml.exe"; DestDir: "{app}"; DestName: "dbml.exe"; Flags: ignoreversion
 ; Ícone da aplicação para atalhos e desinstalador
 Source: "..\..\crates\app\assets\brand\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -72,6 +75,21 @@ Root: HKA; Subkey: "Software\Classes\.dbml\OpenWithProgids"; ValueType: string; 
 Root: HKA; Subkey: "Software\Classes\DBModeling.Document"; ValueType: string; ValueName: ""; ValueData: "Documento DBML"; Flags: uninsdeletekey; Tasks: associate_dbml
 Root: HKA; Subkey: "Software\Classes\DBModeling.Document\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\icon.ico,0"; Flags: uninsdeletekey; Tasks: associate_dbml
 Root: HKA; Subkey: "Software\Classes\DBModeling.Document\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""; Flags: uninsdeletekey; Tasks: associate_dbml
+; Adiciona {app} ao PATH do usuário para disponibilizar o comando `dbml` no terminal
+Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Tasks: addtopath; Check: NeedsAddPath(ExpandConstant('{app}'))
+
+[Code]
+function NeedsAddPath(Param: string): boolean;
+var
+  OrigPath: string;
+begin
+  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OrigPath) then
+  begin
+    Result := True;
+    exit;
+  end;
+  Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+end;
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(AppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

@@ -41,45 +41,55 @@ echo " Alvo:       Chips ARM (Apple Silicon / $ARCH_NAME)"
 echo " Target:     $RUST_TARGET"
 echo "=========================================================="
 
-# Resolução ou compilação do executável
+# Resolução ou compilação do executável (App Desktop + CLI Web Server)
 BIN_SRC=""
+CLI_SRC=""
 
 if [ -n "${TARGET_BIN:-}" ] && [ -f "$TARGET_BIN" ]; then
     echo "==> Utilizando binário pré-fornecido: $TARGET_BIN"
     BIN_SRC="$TARGET_BIN"
 elif [[ "$(uname -s)" == "Darwin" ]]; then
     if [ "$RUST_TARGET" = "universal" ]; then
-        echo "==> Compilando binário Universal (arm64 + x86_64)..."
+        echo "==> Compilando binários Universal (arm64 + x86_64)..."
         rustup target add aarch64-apple-darwin x86_64-apple-darwin 2>/dev/null || true
-        cargo build --release -p app --target aarch64-apple-darwin
-        cargo build --release -p app --target x86_64-apple-darwin
+        cargo build --release -p app -p dbml-cli --target aarch64-apple-darwin
+        cargo build --release -p app -p dbml-cli --target x86_64-apple-darwin
         mkdir -p "$BUILD_DIR/bin"
         lipo -create -output "$BUILD_DIR/bin/db-modeling" \
             target/aarch64-apple-darwin/release/app \
             target/x86_64-apple-darwin/release/app
+        lipo -create -output "$BUILD_DIR/bin/dbml" \
+            target/aarch64-apple-darwin/release/dbml \
+            target/x86_64-apple-darwin/release/dbml
         BIN_SRC="$BUILD_DIR/bin/db-modeling"
+        CLI_SRC="$BUILD_DIR/bin/dbml"
     elif [ "$(uname -m)" = "arm64" ] && [ "$ARCH_NAME" = "arm64" ]; then
         echo "==> Compilando nativamente em Apple Silicon (ARM64)..."
-        cargo build --release -p app
+        cargo build --release -p app -p dbml-cli
         BIN_SRC="target/release/app"
+        CLI_SRC="target/release/dbml"
     else
         echo "==> Compilando para target $RUST_TARGET..."
         rustup target add "$RUST_TARGET" 2>/dev/null || true
-        cargo build --release -p app --target "$RUST_TARGET"
+        cargo build --release -p app -p dbml-cli --target "$RUST_TARGET"
         BIN_SRC="target/$RUST_TARGET/release/app"
+        CLI_SRC="target/$RUST_TARGET/release/dbml"
     fi
 else
     # Host Linux / WSL / CI
     if [ -f "target/$RUST_TARGET/release/app" ]; then
         echo "==> Utilizando binário cross-compilado: target/$RUST_TARGET/release/app"
         BIN_SRC="target/$RUST_TARGET/release/app"
+        CLI_SRC="target/$RUST_TARGET/release/dbml"
     elif [ -f "target/release/app" ]; then
         echo "==> Utilizando binário release local: target/release/app"
         BIN_SRC="target/release/app"
+        CLI_SRC="target/release/dbml"
     else
         echo "==> Compilando DB Modeling em modo release..."
-        cargo build --release -p app
+        cargo build --release -p app -p dbml-cli
         BIN_SRC="target/release/app"
+        CLI_SRC="target/release/dbml"
     fi
 fi
 
@@ -94,9 +104,13 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 mkdir -p "$DISTDIR"
 
-# Instalação do binário
+# Instalação dos binários (App Desktop + CLI Web Server)
 cp "$BIN_SRC" "$APP_DIR/Contents/MacOS/db-modeling"
 chmod 0755 "$APP_DIR/Contents/MacOS/db-modeling"
+if [ -n "$CLI_SRC" ] && [ -f "$CLI_SRC" ]; then
+    cp "$CLI_SRC" "$APP_DIR/Contents/MacOS/dbml"
+    chmod 0755 "$APP_DIR/Contents/MacOS/dbml"
+fi
 
 # Geração do Info.plist com suporte a telas Retina e prioridade de execução ARM64
 cat <<EOF > "$APP_DIR/Contents/Info.plist"
@@ -203,7 +217,8 @@ cat <<'UNINST' > "$APP_DIR/Contents/Resources/uninstall.sh"
 # Desinstalador limpo do DB Modeling para macOS
 echo "==> Desinstalando DB Modeling..."
 rm -rf "/Applications/DB Modeling.app"
-echo "==> DB Modeling desinstalado com sucesso do sistema."
+rm -f "/usr/local/bin/dbml" "/usr/local/bin/db-modeling"
+echo "==> DB Modeling e CLI (dbml) desinstalados com sucesso do sistema."
 UNINST
 chmod 0755 "$APP_DIR/Contents/Resources/uninstall.sh"
 
@@ -212,11 +227,19 @@ chmod 0755 "$APP_DIR/Contents/Resources/uninstall.sh"
 # ============================================================
 PKG_OUT="$DISTDIR/${NAME}-v${VERSION}-${ARCH_NAME}.pkg"
 if command -v pkgbuild &>/dev/null; then
-    echo "==> Compilando Assistente de Instalação Apple Package (.pkg)..."
+    echo "==> Compilando Assistente de Instalação Apple Package (.pkg) (App + CLI dbml)..."
+    PKG_ROOT="$BUILD_DIR/pkg_root"
+    mkdir -p "$PKG_ROOT/Applications" "$PKG_ROOT/usr/local/bin"
+    cp -R "$APP_DIR" "$PKG_ROOT/Applications/"
+    if [ -f "$APP_DIR/Contents/MacOS/dbml" ]; then
+        cp "$APP_DIR/Contents/MacOS/dbml" "$PKG_ROOT/usr/local/bin/dbml"
+        chmod 0755 "$PKG_ROOT/usr/local/bin/dbml"
+    fi
+    ln -sf "/Applications/DB Modeling.app/Contents/MacOS/db-modeling" "$PKG_ROOT/usr/local/bin/db-modeling"
     pkgbuild --identifier "com.dbmodeling.app" \
              --version "${VERSION}" \
-             --install-location "/Applications" \
-             --component "$APP_DIR" \
+             --root "$PKG_ROOT" \
+             --install-location "/" \
              "$PKG_OUT"
     cp -f "$PKG_OUT" "$DISTDIR/${NAME}-macos-setup.pkg"
     echo " Assistente PKG gerado: $PKG_OUT"

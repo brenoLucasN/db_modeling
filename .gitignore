@@ -1,22 +1,47 @@
-# Cargo (cobre também tools/*/target)
+# Cargo (compilação Rust e executáveis)
 target/
 dist/
+dist-*/
 
-# Claude Code (agentes, skills, comandos e configurações)
+# Node.js e dependências JavaScript/TypeScript
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+
+# Builds e Bundles Frontend / Webview / VS Code
+packages/*/dist/
+packages/*/dist-app/
+vscode-extension/dist/
+*.vsix
+*.tsbuildinfo
+.vite/
+
+# WebAssembly gerado localmente (gerado via cargo build / wasm-bindgen)
+**/wasm/*.wasm
+*.wasm
+
+# Ferramentas de IA e caches locais
 .claude/
+.agent/
+.scratch/
+openspec/
 
 # Editores e SO
 .idea/
 .vscode/
 *.swp
+*.swo
 .DS_Store
 Thumbs.db
 
-# Artefatos de teste (insta, screenshots, perfis)
+# Artefatos de teste (insta, screenshots, coverage, perfis)
 *.snap.new
 *.pending-snap
 /screenshots/
 *.profraw
-openspec/
-.scratch/
-.agent/
+coverage/
+.vitest/
