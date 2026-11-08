@@ -54,6 +54,11 @@ de assinatura a proporção de consumo de cota segue a mesma ordem.
    em chamadas simultâneas; tarefas que dependem uma da outra, em sequência.
 8. **Não delegue** o que é mais rápido fazer direto (ler um arquivo conhecido, uma edição de
    uma linha) — delegar tem custo de contexto.
+9. **Sincronia entre Desktop, CLI Web e VS Code:** Sempre que uma tarefa alterar comandos,
+   regras do núcleo (`schema`, `dbml-syntax`, `dbml-analysis`, `dbml-edit`, `layout`, `dbml-wasm`)
+   ou comportamento de UI/Canvas (`crates/app`, `packages/canvas-web`, `vscode-extension`),
+   inclua no prompt do `implementador` e do `revisor` a exigência de atualizar as 3 modalidades e
+   executar `./scripts/sync-build.sh` ao final.
 
 ## Ajustes
 

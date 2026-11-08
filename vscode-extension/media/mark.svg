@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Marca simplificada (16–32 px, monocromática via currentColor): duas tabelas + relação -->
+  <rect x="6" y="8" width="26" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="4"/>
+  <rect x="6" y="8" width="26" height="7" rx="3" fill="currentColor"/>
+  <rect x="32" y="36" width="26" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="4"/>
+  <rect x="32" y="36" width="26" height="7" rx="3" fill="currentColor"/>
+  <path d="M19 28 V40 Q19 44 23 44 H32" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+</svg>

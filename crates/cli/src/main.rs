@@ -1,0 +1,65 @@
+use clap::Parser;
+use colored::Colorize;
+use dbml_cli::args::Cli;
+use dbml_cli::server;
+use dbml_cli::state::AppState;
+use dbml_cli::watcher;
+use std::net::SocketAddr;
+use tokio::net::TcpListener;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    let config = cli.resolve_config()?;
+
+    let state = AppState::new(config.file.clone()).await?;
+
+    // Inicia o observador de arquivos no disco se não desativado
+    if !config.no_watch {
+        watcher::start_file_watcher(state.clone())?;
+    }
+
+    // Tenta alocar a porta desejada ou incrementa se ocupada
+    let mut port = config.port;
+    let listener = loop {
+        let addr: SocketAddr = format!("{}:{}", config.host, port).parse()?;
+        match TcpListener::bind(addr).await {
+            Ok(l) => break l,
+            Err(_) if port < config.port + 50 => {
+                port += 1;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    };
+
+    let url = format!("http://{}:{}/", config.host, port);
+
+    println!("\n{}", "==========================================================".blue().bold());
+    println!("{}", "        DB Modeling - Servidor Web & Canvas Local         ".blue().bold());
+    println!("{}\n", "==========================================================".blue().bold());
+    println!("  {} {}", "Arquivo: ".bold(), state.file_path.display().to_string().cyan());
+    println!("  {} {}", "Sidecar: ".bold(), state.layout_path.display().to_string().cyan());
+    println!("  {} {}", "Servidor:".bold(), url.green().bold().underline());
+    println!("\n  {} Pressione {} para encerrar o servidor.\n", "Dica:".yellow(), "Ctrl+C".bold());
+
+    // Abre o navegador padrão automaticamente
+    if !config.no_open {
+        let open_url = url.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            let _ = opener::open(&open_url);
+        });
+    }
+
+    let app = server::create_router(state);
+
+    // Encerramento gracioso com Ctrl+C
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async {
+            let _ = tokio::signal::ctrl_c().await;
+            println!("\n{}", "Encerrando o servidor DB Modeling com segurança...".yellow());
+        })
+        .await?;
+
+    Ok(())
+}

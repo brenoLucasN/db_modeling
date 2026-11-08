@@ -1,0 +1,82 @@
+import * as esbuild from 'esbuild';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const isProduction = process.argv.includes('--production');
+const isWatch = process.argv.includes('--watch');
+
+async function main() {
+  // Garante existência de dist/
+  if (!fs.existsSync('dist')) {
+    fs.mkdirSync('dist', { recursive: true });
+  }
+
+  // Copia o bundle do canvas web para a pasta dist da extensão
+  const canvasWebSrc = path.resolve('../packages/canvas-web/dist/index.js');
+  if (fs.existsSync(canvasWebSrc)) {
+    fs.copyFileSync(canvasWebSrc, 'dist/canvas-web.js');
+    console.log('✓ Bundle do canvas-web copiado para dist/canvas-web.js');
+  }
+
+  // Verifica e copia o bundle Wasm embutido se existir
+  const wasmSrc = path.resolve('../packages/canvas-web/src/wasm/dbml_wasm_bg.wasm');
+  const wasmJsSrc = path.resolve('../packages/canvas-web/src/wasm/dbml_wasm.js');
+  if (fs.existsSync(wasmSrc) && fs.existsSync(wasmJsSrc)) {
+    const wasmBuffer = fs.readFileSync(wasmSrc);
+    const wasmBase64 = wasmBuffer.toString('base64');
+    let jsCode = fs.readFileSync(wasmJsSrc, 'utf-8');
+    jsCode = jsCode.replace(/export\s+\{([^}]+)\};?/g, '');
+    jsCode = jsCode.replace(/export\s+function\s+/g, 'function ');
+    jsCode = jsCode.replace(/\/\* @ts-self-types[^*]*\*\//g, '');
+    // `import.meta` é erro de sintaxe em <script> clássico; o Wasm é instanciado via initSync (bytes embutidos)
+    jsCode = jsCode.replace(/new URL\('dbml_wasm_bg\.wasm', import\.meta\.url\)/g, 'undefined');
+
+    const wasmBundle = `(function() {
+      ${jsCode}
+      const base64Data = "${wasmBase64}";
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const __dbmInstance = initSync({ module: bytes });
+      window.DbModelingParser = {
+        parse_and_analyze: parse_and_analyze,
+        apply_command: apply_command,
+        format_dbml: format_dbml,
+        compute_layout: compute_layout,
+        compute_scene: compute_scene,
+        swap_dbml_lines: swap_dbml_lines,
+        wasmInstance: __dbmInstance
+      };
+    })();`;
+    fs.writeFileSync('dist/dbml-wasm.bundle.js', wasmBundle);
+    console.log('✓ Bundle Wasm embutido gerado em dist/dbml-wasm.bundle.js');
+  }
+
+  const context = await esbuild.context({
+    entryPoints: ['src/extension.ts'],
+    bundle: true,
+    format: 'cjs',
+    minify: isProduction,
+    sourcemap: !isProduction,
+    sourcesContent: false,
+    platform: 'node',
+    outfile: 'dist/extension.cjs',
+    external: ['vscode'],
+    logLevel: 'info',
+  });
+
+  if (isWatch) {
+    await context.watch();
+    console.log('Assistindo alterações em modo watch...');
+  } else {
+    await context.rebuild();
+    await context.dispose();
+  }
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

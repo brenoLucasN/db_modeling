@@ -4,13 +4,14 @@
 
 **Modele bancos de dados no canvas ou no texto — os dois são a mesma coisa.**
 
-App desktop nativo para **Windows e Ubuntu**, escrito em **Rust + GPUI**.
-Na linha do dbdiagram.io, DrawSQL e Azimutt, com foco total em UI/UX.
+Ecossistema nativo de modelagem visual de bancos de dados escrito em **Rust + GPUI / WebAssembly / Axum**.
+Na linha do dbdiagram.io, DrawSQL e Azimutt, com foco total em UI/UX e sincronização bidirecional.
 
 ![Rust](https://img.shields.io/badge/Rust-1.99-orange?logo=rust)
 ![GPUI](https://img.shields.io/badge/UI-GPUI-blue)
-![Plataformas](https://img.shields.io/badge/Windows%20%7C%20Ubuntu-lightgrey)
-![Status](https://img.shields.io/badge/status-Fase%200%2F1-yellow)
+![WebAssembly](https://img.shields.io/badge/WebAssembly-Wasm-purple)
+![Plataformas](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
+![VS Code](https://img.shields.io/badge/VS%20Code-Extension-007ACC?logo=visualstudiocode)
 
 <img src="docs/img/canvas-escuro.png" alt="Canvas do DB Modeling no tema escuro, com tabelas agrupadas e relações" width="900">
 
@@ -18,18 +19,42 @@ Na linha do dbdiagram.io, DrawSQL e Azimutt, com foco total em UI/UX.
 
 ## O que é
 
-Ferramentas de modelagem costumam ser **texto primeiro** (o diagrama é só um preview) ou
-**UI primeiro** (lentas, cheias de modais, ruins de versionar). O DB Modeling junta as duas:
+Ferramentas de modelagem costumam ser **texto primeiro** (o diagrama é só um preview estático) ou
+**UI primeiro** (lentas, cheias de modais, ruins de versionar). O DB Modeling une os dois mundos:
 
-- **Schema em DBML**, um texto legível que versiona bem em git.
-- **Canvas de primeira classe**: tabelas, colunas e relações editáveis direto no diagrama.
-- **Edição bidirecional**: mexer num lado atualiza o outro, e suas edições viram patches
-  mínimos no texto, preservando comentários e formatação.
-- **Rápido, offline e nativo**, com teclado primeiro e command palette (`Ctrl+K`).
+- **Schema em DBML**, formato canônico legível e ideal para controle de versão em Git.
+- **Canvas de primeira classe**: tabelas, colunas e relações editáveis direto no diagrama com zero modais.
+- **Edição bidirecional**: mexer num lado atualiza o outro, e suas edições viram **patches mínimos** no texto, preservando rigorosamente comentários e formatação original.
+- **Rápido, offline e nativo**, com foco em teclado, atalhos fluidos e command palette (`Ctrl+K`).
+- **Exportação completa**: PNG, JPEG, SVG vetorial e sintaxe Mermaid `erDiagram`.
 
-Sem conexão com banco e sem SQL: o foco é o visual.
+---
 
-## Em ação
+## 3 Maneiras de Usar
+
+### 1. App Desktop Nativo (GPUI)
+Para quem busca a experiência máxima de performance: janelas nativas aceleradas por hardware (DirectX no Windows, Vulkan no Linux, Metal no macOS) renderizando a 120 fps.
+
+### 2. Extensão Oficial do VS Code (`.vsix`)
+Edite e visualize seus diagramas sem sair do editor.
+- Abre arquivos `.dbml` no editor visual customizado com clique duplo ou via botão **"Abrir no Canvas Visual"** (`Ctrl+Alt+D` / menu de navegação).
+- Núcleo Rowan/CST compilado para **WebAssembly**, calculando patches mínimos com coordenadas de linha/coluna UTF-16 em tempo real.
+- Barra de ferramentas integrada para **Auto-Layout** (Sugiyama), **Formatação canônica**, **Exportação para SVG** e **Mermaid**.
+
+### 3. Utilitário CLI & Web Server (`dbml run`)
+Para quem edita em Vim, Neovim, Helix, Sublime ou qualquer outro editor externo:
+```bash
+# Inicia o servidor local Axum e abre o Canvas no navegador padrão
+dbml run schema.dbml
+# Ou especifique porta customizada:
+dbml run schema.dbml --port 4000
+```
+- Servidor HTTP/WebSocket ultraleve em Axum com assets embutidos em tempo de compilação (`rust-embed`).
+- Monitoramento contínuo de arquivos via `notify` com hashing anti-eco: alterou no seu editor, o navegador atualiza na hora; alterou no navegador, o arquivo é salvo atomicamente no disco.
+
+---
+
+## Em Ação
 
 ### Texto e canvas lado a lado
 
@@ -41,55 +66,44 @@ O editor DBML abre ao lado do canvas (`Ctrl+E`) e as duas visões ficam sempre s
 
 <img src="docs/img/canvas-claro.png" alt="Canvas do DB Modeling no tema claro" width="900">
 
-### O que já aparece nas imagens
+---
 
-- Tabelas com PK, FK, tipos e `NOT NULL`, e relações roteadas com cardinalidade (1 / N).
-- **Grupos** coloridos (`TableGroup`) e painel lateral com tabelas, relações e diagnósticos.
-- Barra de ferramentas (selecionar, mover, nova tabela, auto-layout, ajustar à tela), zoom e painel de propriedades.
-- Editor DBML com realce de sintaxe e contagem de erros e avisos na barra de status.
-
-> Em desenvolvimento: export **PNG, JPEG e Mermaid `erDiagram`**, múltiplas vistas, sugestões
-> inteligentes e instaladores. Veja o [roadmap](docs/06-roadmap.md).
-
-## Como buildar e usar
+## Como Buildar e Testar
 
 Toolchain fixada em `rust-toolchain.toml` (rustc 1.99.1); o `rustup` a instala sozinho.
 
 | Objetivo | Comando |
 |---|---|
-| Rodar o app (Linux) | `cargo run -p app` |
-| Build release | `cargo build --release -p app` |
-| Testes do núcleo | `cargo test --workspace` |
-| Lint / formatação | `cargo clippy --workspace` · `cargo fmt --all` |
-| Pacote Fedora (`.rpm` p/ DNF) | `scripts/build-fedora.sh` (gera pacote `.rpm` em `dist/`) |
-| Pacote Ubuntu/Debian (`.deb`) | `scripts/build-deb.sh` (gera pacote `.deb` em `dist/`) |
-| `.exe` Windows (cross, do WSL) | `scripts/build-windows.sh` (gera `.exe` em `dist/` e no Desktop) |
-| macOS (`.dmg` e bundle `.app`) | `scripts/build-macos.sh` (gera `.dmg` e `.app` em `dist/`) |
-| Atualizar versão do projeto | `scripts/bump-version.sh <versao>` (atualiza `Cargo.toml`) |
+| **Rodar App Desktop (Linux)** | `cargo run -p app` |
+| **Rodar CLI Web Server** | `cargo run -p dbml-cli -- run schema.dbml` |
+| **Testes do Workspace Rust** | `cargo test --workspace` |
+| **Testes Unitários do Canvas Web** | `cd packages/canvas-web && npm test` |
+| **Compilar Wasm** | `cargo build -p dbml-wasm --target wasm32-unknown-unknown --release` |
+| **Empacotar Extensão VS Code** | `cd vscode-extension && npm run build && npm run package` |
+| **Lint & Formatação** | `cargo clippy --workspace` · `cargo fmt --all` |
 
-### Instalação e Atualização de Versões
+---
 
-Todos os instaladores são gerados no diretório `dist/` já integrados com o menu de aplicativos (`.desktop` no Linux, `.app` no macOS) e ícones oficiais em múltiplas resoluções:
+## Instaladores e Pacotes de Distribuição
 
-- **Passo a passo para lançar uma atualização:**
-  1. Atualize a versão unificada: `./scripts/bump-version.sh 0.1.1`
-  2. Gere o pacote desejado (`./scripts/build-fedora.sh`, `./scripts/build-deb.sh`, `./scripts/build-windows.sh` ou `./scripts/build-macos.sh`)
+Todos os instaladores são gerados no diretório `dist/` com suporte a instalação, atualização in-loco e desinstalação completa:
+
+- **Instalador Universal CLI (Linux/macOS):**
+  - Instalação com resolução automática de dependências: `./scripts/install.sh`
+  - Desinstalação limpa: `./scripts/install.sh --uninstall`
 - **Fedora (`.rpm` via DNF):**
-  - Instalação / Upgrade: `sudo dnf install ./dist/db-modeling-*.rpm` (ou `sudo dnf upgrade ./dist/db-modeling-*.rpm`)
+  - Build: `./scripts/build-fedora.sh`
+  - Instalação: `sudo dnf install ./dist/db-modeling-*.rpm`
 - **Ubuntu / Debian (`.deb` via APT):**
-  - Instalação / Upgrade: `sudo apt install ./dist/db-modeling_*_amd64.deb` (ou `sudo dpkg -i ./dist/db-modeling_*_amd64.deb`)
-- **Windows (`.exe`):**
-  - Executável versionado em `dist/db-modeling-v<versao>-x86_64.exe` (copiado automaticamente para o Desktop do Windows quando gerado a partir do WSL2).
-- **macOS (`.dmg` e `.app`):**
-  - Imagem de disco montável em `dist/db-modeling-v<versao>-arm64.dmg` (com alias `-aarch64.dmg` para chips ARM / Apple Silicon M1/M2/M3/M4). Ao abrir, basta arrastar o `DB Modeling.app` para a pasta `/Applications`.
+  - Build: `./scripts/build-deb.sh`
+  - Instalação: `sudo apt install ./dist/db-modeling_*_amd64.deb`
+- **Windows (`.exe` com Inno Setup Wizard):**
+  - Build: `./scripts/build-windows.sh`
+  - Script Inno Setup: `scripts/windows/installer.iss` (com atalhos no Menu Iniciar, Desktop e associação de arquivos `.dbml`).
+- **macOS (`.dmg` e `.pkg`):**
+  - Build: `./scripts/build-macos.sh` (gera `.dmg` e instalador nativo `.pkg` com desinstalador).
 
-- **Ubuntu 22.04/24.04:** o GPUI precisa dos headers de Vulkan, X11/xkbcommon, Wayland e
-  fontconfig/freetype (lista exata em [docs/04-stack.md](docs/04-stack.md)). Roda em Wayland e X11.
-- **Fedora:** o GPUI precisa dos mesmos headers de desenvolvimento (`sudo dnf install libxkbcommon-devel libxkbcommon-x11-devel libxcb-devel freetype-devel fontconfig-devel vulkan-loader-devel wayland-devel libxkbfile-devel`). Roda em Wayland e X11.
-- **Troubleshooting de link (`undefined hidden symbol`):** se a compilação falhar inicialmente por dependência ausente e depois apresentar erros de `rust-lld: error: undefined hidden symbol`, o cache incremental da crate `app` pode ter ficado inconsistente. Rode `cargo clean -p app && cargo build -p app` para limpar apenas os objetos do app (sem recompilar as dependências externas).
-- **WSL2:** compila normalmente, mas rodar o GPUI no WSLg ainda não foi validado (risco R1).
-- **Perfil dev:** já vem com `opt-level = 1` (dependências em 3); sem isso o GPUI fica muito lento.
-- **Instaladores:** pacotes nativos Fedora (`.rpm`), Debian/Ubuntu (`.deb`) e executável Windows (`.exe`) disponíveis via scripts em `scripts/`. Demais formatos (AppImage/MSI) planejados.
+---
 
 ## Documentação
 

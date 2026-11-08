@@ -1,0 +1,112 @@
+use crate::assets::static_handler;
+use crate::state::AppState;
+use axum::{
+    Router,
+    extract::{
+        State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
+    response::IntoResponse,
+    routing::get,
+};
+use futures_util::{SinkExt, StreamExt};
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+#[serde(tag = "type", content = "payload")]
+enum ClientMessage {
+    #[serde(rename = "apply_patch")]
+    ApplyPatch {
+        byte_start: usize,
+        byte_end: usize,
+        new_text: String,
+    },
+    #[serde(rename = "save_source")]
+    SaveSource(String),
+    #[serde(rename = "save_layout")]
+    SaveLayout(serde_json::Value),
+}
+
+pub fn create_router(state: AppState) -> Router {
+    Router::new()
+        .route("/ws", get(ws_handler))
+        .fallback(static_handler)
+        .with_state(state)
+}
+
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_socket(socket, state))
+}
+
+async fn handle_socket(socket: WebSocket, state: AppState) {
+    let (mut sender, mut receiver) = socket.split();
+
+    // 1. Envia payload inicial ao conectar
+    {
+        let content = state.content.read().await.clone();
+        let layout: Option<serde_json::Value> = state
+            .layout
+            .read()
+            .await
+            .as_ref()
+            .and_then(|s| serde_json::from_str(s).ok());
+
+        let init_msg = serde_json::json!({
+            "type": "init",
+            "source": content,
+            "layout": layout
+        })
+        .to_string();
+
+        if sender.send(Message::Text(init_msg.into())).await.is_err() {
+            return;
+        }
+    }
+
+    // 2. Canal de broadcast para enviar atualizações externas a este cliente
+    let mut rx = state.tx.subscribe();
+    let mut send_task = tokio::spawn(async move {
+        while let Ok(msg) = rx.recv().await {
+            if sender.send(Message::Text(msg.into())).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // 3. Recebe mensagens enviadas pelo navegador (patches e layout)
+    let state_clone = state.clone();
+    let mut recv_task = tokio::spawn(async move {
+        while let Some(Ok(Message::Text(text))) = receiver.next().await {
+            if let Ok(client_msg) = serde_json::from_str::<ClientMessage>(&text) {
+                match client_msg {
+                    ClientMessage::ApplyPatch {
+                        byte_start,
+                        byte_end,
+                        new_text,
+                    } => {
+                        let current = state_clone.content.read().await.clone();
+                        if byte_start <= byte_end && byte_end <= current.len() {
+                            let mut updated = current;
+                            updated.replace_range(byte_start..byte_end, &new_text);
+                            let _ = state_clone.save_content(updated).await;
+                        }
+                    }
+                    ClientMessage::SaveSource(new_source) => {
+                        let _ = state_clone.save_content(new_source).await;
+                    }
+                    ClientMessage::SaveLayout(layout_val) => {
+                        if let Ok(layout_str) = serde_json::to_string_pretty(&layout_val) {
+                            let _ = state_clone.save_layout(layout_str).await;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Se qualquer uma das tarefas encerrar, aborta a outra
+    tokio::select! {
+        _ = (&mut send_task) => recv_task.abort(),
+        _ = (&mut recv_task) => send_task.abort(),
+    };
+}

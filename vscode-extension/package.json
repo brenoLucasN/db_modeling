@@ -1,0 +1,146 @@
+{
+  "name": "dbmodeling-vscode",
+  "displayName": "DB Modeling",
+  "description": "Modelagem visual e bidirecional de bancos de dados com DBML no VS Code",
+  "version": "0.1.1",
+  "type": "module",
+  "publisher": "dbmodeling",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brenoLucasN/db_modeling.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Visualization",
+    "Other"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onStartupFinished",
+    "onCustomEditor:dbmodeling.editor",
+    "onLanguage:dbml"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "dbml",
+        "aliases": ["DBML", "dbml"],
+        "extensions": [".dbml"]
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dbmodeling-sidebar",
+          "title": "DB Modeling",
+          "icon": "media/mark.svg"
+        }
+      ]
+    },
+    "views": {
+      "dbmodeling-sidebar": [
+        {
+          "id": "dbmodeling.workspaceView",
+          "name": "Esquemas DBML",
+          "icon": "media/mark.svg",
+          "contextualTitle": "DB Modeling"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "dbmodeling.workspaceView",
+        "contents": "Modele seu banco de dados visualmente, com as mesmas funcionalidades do app desktop.\n[Abrir DB Modeling](command:dbmodeling.openWorkbench)\n[Novo esquema DBML](command:dbmodeling.newFile)\nNenhum arquivo .dbml encontrado neste workspace."
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "dbmodeling.editor",
+        "displayName": "DB Modeling Canvas",
+        "selector": [
+          {
+            "filenamePattern": "*.dbml"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "dbmodeling.openWorkbench",
+        "title": "Abrir DB Modeling",
+        "icon": "$(database)",
+        "category": "DB Modeling"
+      },
+      {
+        "command": "dbmodeling.newFile",
+        "title": "Novo Esquema DBML",
+        "icon": "$(add)",
+        "category": "DB Modeling"
+      },
+      {
+        "command": "dbmodeling.refresh",
+        "title": "Atualizar Lista",
+        "icon": "$(refresh)",
+        "category": "DB Modeling"
+      },
+      {
+        "command": "dbmodeling.openCanvas",
+        "title": "Abrir no Canvas Visual",
+        "icon": "$(graph)",
+        "category": "DB Modeling"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "dbmodeling.openWorkbench",
+          "when": "view == dbmodeling.workspaceView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dbmodeling.newFile",
+          "when": "view == dbmodeling.workspaceView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "dbmodeling.refresh",
+          "when": "view == dbmodeling.workspaceView",
+          "group": "navigation@3"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "dbmodeling.openCanvas",
+          "when": "resourceExtname == .dbml",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "dbmodeling.openCanvas",
+          "when": "resourceExtname == .dbml",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "compile": "tsc -p ./ --noEmit",
+    "package": "npx -y @vscode/vsce package --no-dependencies --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  }
+}
