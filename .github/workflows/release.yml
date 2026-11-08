@@ -95,8 +95,8 @@ jobs:
         with:
           shared-key: "release-windows"
 
-      - name: Compilar executável release
-        run: cargo build --release -p app
+      - name: Compilar executáveis release (App Desktop + CLI Web Server)
+        run: cargo build --release -p app -p dbml-cli
 
       - name: Compilar Instalador Oficial com Wizard (Inno Setup)
         shell: bash
