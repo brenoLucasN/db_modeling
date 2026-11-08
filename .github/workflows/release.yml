@@ -1,0 +1,199 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag de versão manual (ex: v0.1.0)'
+        required: false
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  # ============================================================
+  # 1. BUILD LINUX (Ubuntu / Debian .deb & Fedora .rpm)
+  # ============================================================
+  build-linux:
+    name: Build Linux (.deb e .rpm)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências nativas e de empacotamento
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libxkbcommon-dev \
+            libvulkan-dev \
+            libwayland-dev \
+            libx11-xcb-dev \
+            rpm
+
+      - name: Instalar Toolchain Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache de compilação
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "release-linux"
+
+      - name: Gerar pacote Debian / Ubuntu (.deb)
+        run: ./scripts/build-deb.sh
+
+      - name: Gerar pacote Fedora / RHEL (.rpm)
+        run: ./scripts/build-fedora.sh
+
+      - name: Criar aliases com nomes canônicos
+        run: |
+          cd dist
+          # Cria links canônicos para download direto sem versão no nome
+          cp $(ls db-modeling_*_amd64.deb | head -n 1) db-modeling-linux-amd64.deb
+          cp $(ls db-modeling-*-1.*.rpm | head -n 1) db-modeling-linux-x86_64.rpm
+
+      - name: Upload dos artefatos Linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-linux
+          path: dist/*
+          retention-days: 1
+
+  # ============================================================
+  # 2. BUILD WINDOWS (.exe)
+  # ============================================================
+  build-windows:
+    name: Build Windows (.exe)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar Toolchain Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache de compilação
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "release-windows"
+
+      - name: Compilar executável release
+        run: cargo build --release -p app
+
+      - name: Preparar artefatos Windows
+        shell: bash
+        run: |
+          mkdir -p dist
+          VERSION="$(cargo pkgid -p app | cut -d# -f2 | cut -d: -f2 2>/dev/null || sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
+          cp target/release/app.exe "dist/db-modeling-v${VERSION}-x86_64.exe"
+          cp target/release/app.exe "dist/db-modeling-windows-x86_64.exe"
+
+      - name: Upload dos artefatos Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-windows
+          path: dist/*
+          retention-days: 1
+
+  # ============================================================
+  # 3. BUILD MACOS (.dmg Apple Silicon)
+  # ============================================================
+  build-macos:
+    name: Build macOS (.dmg)
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar Toolchain Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache de compilação
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "release-macos"
+
+      - name: Gerar imagem montável .dmg
+        run: ./scripts/build-macos.sh arm64
+
+      - name: Criar aliases com nomes canônicos
+        run: |
+          cd dist
+          cp $(ls db-modeling-*-arm64.dmg | head -n 1) db-modeling-macos-arm64.dmg
+
+      - name: Upload dos artefatos macOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-macos
+          path: dist/*.dmg
+          retention-days: 1
+
+  # ============================================================
+  # 4. PUBLICAÇÃO OFICIAL NO GITHUB RELEASES
+  # ============================================================
+  publish:
+    name: Publicar Release Oficial
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Criar pasta consolidada de distribuição
+        run: mkdir -p release-dist
+
+      - name: Baixar artefatos Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-linux
+          path: release-dist
+
+      - name: Baixar artefatos Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-windows
+          path: release-dist
+
+      - name: Baixar artefatos macOS
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-macos
+          path: release-dist
+
+      - name: Gerar somas de verificação SHA-256
+        run: |
+          cd release-dist
+          sha256sum * > SHA256SUMS.txt
+          echo "=== Checksums gerados ==="
+          cat SHA256SUMS.txt
+
+      - name: Determinar Tag
+        id: tag_info
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Criar Release no GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_info.outputs.tag }}
+          files: release-dist/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
