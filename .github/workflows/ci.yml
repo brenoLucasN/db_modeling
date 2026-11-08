@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop, dev ]
+  pull_request:
+    branches: [ main, master, develop, dev ]
+
+# Cancela execuções concorrentes do mesmo PR se novos commits forem enviados
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Verificação e Testes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências nativas (GPUI / Wayland / Vulkan / X11 / Fontconfig)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libfontconfig1-dev \
+            libasound2-dev \
+            libxkbcommon-dev \
+            libvulkan-dev \
+            libwayland-dev \
+            libx11-xcb-dev
+
+      - name: Instalar Toolchain Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache de compilação do Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "workspace-ci"
+
+      - name: Verificar formatação (cargo fmt)
+        run: cargo fmt --all -- --check
+
+      - name: Executar linter (cargo clippy)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Executar suíte de testes (cargo test)
+        run: cargo test --workspace
