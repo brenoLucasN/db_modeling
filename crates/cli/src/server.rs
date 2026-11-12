@@ -107,7 +107,11 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                         }
                     }
                     ClientMessage::OpenFile(path) => {
-                        if state_clone.switch_file(std::path::PathBuf::from(path)).await.is_ok() {
+                        if state_clone
+                            .switch_file(std::path::PathBuf::from(path))
+                            .await
+                            .is_ok()
+                        {
                             let content = state_clone.content.read().await.clone();
                             let layout: Option<serde_json::Value> = state_clone
                                 .layout

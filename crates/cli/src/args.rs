@@ -103,13 +103,7 @@ impl Cli {
                 no_open,
                 no_watch,
             }) => (file, port, host, no_open, no_watch),
-            None => (
-                self.file,
-                self.port,
-                self.host,
-                self.no_open,
-                self.no_watch,
-            ),
+            None => (self.file, self.port, self.host, self.no_open, self.no_watch),
         };
 
         let resolved_file = match file {
