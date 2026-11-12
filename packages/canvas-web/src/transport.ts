@@ -9,6 +9,7 @@ import {
   SidecarLayout,
   Diagnostic,
   WorkspaceFileEntry,
+  SessionSnapshot,
 } from './types';
 
 declare function acquireVsCodeApi(): {
@@ -37,7 +38,7 @@ export class VsCodeTransport implements HostTransport {
   private updateCallback?: (
     source: string,
     layout?: SidecarLayout,
-    meta?: { title?: string; files?: WorkspaceFileEntry[] }
+    meta?: { title?: string; files?: WorkspaceFileEntry[]; session?: SessionSnapshot }
   ) => void;
   private workspaceFilesCallback?: (
     files: WorkspaceFileEntry[],
@@ -58,6 +59,7 @@ export class VsCodeTransport implements HostTransport {
             this.updateCallback(message.source, message.layout, {
               title: message.title,
               files: message.files,
+              session: message.session,
             });
           }
           if (message.files && this.workspaceFilesCallback) {
@@ -129,11 +131,24 @@ export class VsCodeTransport implements HostTransport {
     });
   }
 
+  public getSession(): SessionSnapshot | null {
+    const s = this.vscode.getState();
+    return s && typeof s === 'object' ? (s as SessionSnapshot) : null;
+  }
+
+  public saveSession(session: SessionSnapshot): void {
+    this.vscode.setState(session);
+    this.vscode.postMessage({
+      command: 'save_session',
+      session,
+    });
+  }
+
   public onDocumentUpdated(
     callback: (
       source: string,
       layout?: SidecarLayout,
-      meta?: { title?: string; files?: WorkspaceFileEntry[] }
+      meta?: { title?: string; files?: WorkspaceFileEntry[]; session?: SessionSnapshot }
     ) => void
   ): void {
     this.updateCallback = callback;
@@ -161,7 +176,7 @@ export class WebSocketTransport implements HostTransport {
   private updateCallback?: (
     source: string,
     layout?: SidecarLayout,
-    meta?: { title?: string; files?: WorkspaceFileEntry[] }
+    meta?: { title?: string; files?: WorkspaceFileEntry[]; session?: SessionSnapshot }
   ) => void;
   private externalChangeCallback?: (newSource: string) => void;
   private reconnectTimer: number | null = null;
@@ -183,6 +198,7 @@ export class WebSocketTransport implements HostTransport {
               this.updateCallback(msg.source, msg.layout, {
                 title: msg.title,
                 files: msg.files,
+                session: msg.session,
               });
             }
           } else if (msg.type === 'external_change') {
@@ -256,11 +272,17 @@ export class WebSocketTransport implements HostTransport {
     URL.revokeObjectURL(url);
   }
 
+  public async openFile(path: string): Promise<void> {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'open_file', payload: path }));
+    }
+  }
+
   public onDocumentUpdated(
     callback: (
       source: string,
       layout?: SidecarLayout,
-      meta?: { title?: string; files?: WorkspaceFileEntry[] }
+      meta?: { title?: string; files?: WorkspaceFileEntry[]; session?: SessionSnapshot }
     ) => void
   ): void {
     this.updateCallback = callback;

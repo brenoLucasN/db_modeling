@@ -245,6 +245,8 @@ dependencies = [
  "lsp-types",
  "rust-embed",
  "schema",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

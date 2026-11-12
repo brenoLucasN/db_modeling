@@ -7,6 +7,7 @@ mod canvas;
 mod glass;
 mod ide;
 mod platform;
+mod session;
 mod settings;
 mod shell;
 mod widgets;

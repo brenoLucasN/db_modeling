@@ -169,6 +169,18 @@ impl Diagram {
         self.zoom
     }
 
+    pub fn viewport(&self) -> (f32, f32, f32) {
+        (self.zoom, self.pan.0, self.pan.1)
+    }
+
+    pub fn set_viewport(&mut self, zoom: f32, pan: (f32, f32)) {
+        if zoom.is_finite() && zoom > 0.0 && pan.0.is_finite() && pan.1.is_finite() {
+            self.zoom = zoom;
+            self.pan = pan;
+            self.needs_fit = false;
+        }
+    }
+
     /// Seleciona a tabela e centraliza a vista nela.
     pub fn focus_table(&mut self, name: &str) {
         let Some(t) = self.schema.table(name) else {
