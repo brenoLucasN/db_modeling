@@ -34,9 +34,9 @@ pub struct Cli {
 pub enum Commands {
     /// Start the local server and open the visual canvas in the browser
     Run {
-        /// Path to the .dbml file
+        /// Path to the .dbml file or project folder
         #[arg(value_name = "FILE")]
-        file: PathBuf,
+        file: Option<PathBuf>,
 
         /// Local web server port
         #[arg(short, long, default_value_t = 3000)]
@@ -56,9 +56,9 @@ pub enum Commands {
     },
     /// Alias to start the web server
     Serve {
-        /// Path to the .dbml file
+        /// Path to the .dbml file or project folder
         #[arg(value_name = "FILE")]
-        file: PathBuf,
+        file: Option<PathBuf>,
 
         /// Local web server port
         #[arg(short, long, default_value_t = 3000)]
@@ -88,7 +88,7 @@ pub struct RunConfig {
 
 impl Cli {
     pub fn resolve_config(self) -> anyhow::Result<RunConfig> {
-        match self.command {
+        let (file, port, host, no_open, no_watch) = match self.command {
             Some(Commands::Run {
                 file,
                 port,
@@ -102,26 +102,29 @@ impl Cli {
                 host,
                 no_open,
                 no_watch,
-            }) => Ok(RunConfig {
-                file,
-                port,
-                host,
-                no_open,
-                no_watch,
-            }),
+            }) => (file, port, host, no_open, no_watch),
+            None => (self.file, self.port, self.host, self.no_open, self.no_watch),
+        };
+
+        let resolved_file = match file {
+            Some(f) => f,
             None => {
-                if let Some(file) = self.file {
-                    Ok(RunConfig {
-                        file,
-                        port: self.port,
-                        host: self.host,
-                        no_open: self.no_open,
-                        no_watch: self.no_watch,
-                    })
-                } else {
-                    anyhow::bail!("No .dbml file specified. Usage: dbml run <file.dbml>");
+                let session = crate::session::load();
+                match session.last_target {
+                    Some(prev) if prev.exists() => prev,
+                    _ => anyhow::bail!(
+                        "No .dbml file or folder specified and no previous session found. Usage: dbml <file.dbml | folder>"
+                    ),
                 }
             }
-        }
+        };
+
+        Ok(RunConfig {
+            file: resolved_file,
+            port,
+            host,
+            no_open,
+            no_watch,
+        })
     }
 }

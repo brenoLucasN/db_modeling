@@ -163,6 +163,13 @@ export interface WorkspaceFileEntry {
   active?: boolean;
 }
 
+export interface SessionSnapshot {
+  pane?: 'files' | 'schema' | 'problems';
+  editorOpen?: boolean;
+  zoom?: number;
+  pan?: { x: number; y: number };
+}
+
 /** Interface unificada de comunicação com o hospedeiro (VS Code Webview ou CLI WebSocket) */
 export interface HostTransport {
   sendPatch(patch: TextPatch): Promise<void>;
@@ -170,11 +177,13 @@ export interface HostTransport {
   exportFile?(filename: string, content: string, isBinary: boolean): Promise<void>;
   openFile?(path: string): Promise<void>;
   createNewFile?(): Promise<void>;
+  saveSession?(session: SessionSnapshot): void;
+  getSession?(): SessionSnapshot | null;
   onDocumentUpdated(
     callback: (
       source: string,
       layout?: SidecarLayout,
-      meta?: { title?: string; files?: WorkspaceFileEntry[] }
+      meta?: { title?: string; files?: WorkspaceFileEntry[]; session?: SessionSnapshot }
     ) => void
   ): void;
   onWorkspaceFilesUpdated?(

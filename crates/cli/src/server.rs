@@ -25,6 +25,8 @@ enum ClientMessage {
     SaveSource(String),
     #[serde(rename = "save_layout")]
     SaveLayout(serde_json::Value),
+    #[serde(rename = "open_file")]
+    OpenFile(String),
 }
 
 pub fn create_router(state: AppState) -> Router {
@@ -51,10 +53,15 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
             .as_ref()
             .and_then(|s| serde_json::from_str(s).ok());
 
+        let title = state.active_title().await;
+        let files = state.workspace_files().await;
+
         let init_msg = serde_json::json!({
             "type": "init",
             "source": content,
-            "layout": layout
+            "layout": layout,
+            "title": title,
+            "files": files
         })
         .to_string();
 
@@ -97,6 +104,32 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     ClientMessage::SaveLayout(layout_val) => {
                         if let Ok(layout_str) = serde_json::to_string_pretty(&layout_val) {
                             let _ = state_clone.save_layout(layout_str).await;
+                        }
+                    }
+                    ClientMessage::OpenFile(path) => {
+                        if state_clone
+                            .switch_file(std::path::PathBuf::from(path))
+                            .await
+                            .is_ok()
+                        {
+                            let content = state_clone.content.read().await.clone();
+                            let layout: Option<serde_json::Value> = state_clone
+                                .layout
+                                .read()
+                                .await
+                                .as_ref()
+                                .and_then(|s| serde_json::from_str(s).ok());
+                            let title = state_clone.active_title().await;
+                            let files = state_clone.workspace_files().await;
+                            let update_msg = serde_json::json!({
+                                "type": "update",
+                                "source": content,
+                                "layout": layout,
+                                "title": title,
+                                "files": files
+                            })
+                            .to_string();
+                            let _ = state_clone.tx.send(update_msg);
                         }
                     }
                 }

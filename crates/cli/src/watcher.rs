@@ -4,7 +4,10 @@ use std::sync::mpsc::channel;
 use std::time::Duration;
 
 pub fn start_file_watcher(state: AppState) -> anyhow::Result<()> {
-    let file_path = state.file_path.clone();
+    let watch_dir = state
+        .project_dir
+        .clone()
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
 
     tokio::task::spawn_blocking(move || {
         let (tx, rx) = channel();
@@ -17,10 +20,10 @@ pub fn start_file_watcher(state: AppState) -> anyhow::Result<()> {
             }
         };
 
-        if let Err(e) = watcher.watch(&file_path, RecursiveMode::NonRecursive) {
+        if let Err(e) = watcher.watch(&watch_dir, RecursiveMode::NonRecursive) {
             eprintln!(
-                "Warning: Failed to watch file '{}': {e}",
-                file_path.display()
+                "Warning: Failed to watch directory '{}': {e}",
+                watch_dir.display()
             );
             return;
         }
@@ -35,12 +38,11 @@ pub fn start_file_watcher(state: AppState) -> anyhow::Result<()> {
                     // Limpa eventos pendentes na fila
                     while rx.try_recv().is_ok() {}
 
-                    if let Ok(new_content) = std::fs::read_to_string(&file_path) {
-                        let current_hash = compute_hash(&new_content);
-
-                        // Executa verificação em runtime Tokio assíncrono
-                        let state = state.clone();
-                        tokio::spawn(async move {
+                    let state = state.clone();
+                    tokio::spawn(async move {
+                        let file_path = state.file_path.read().await.clone();
+                        if let Ok(new_content) = std::fs::read_to_string(&file_path) {
+                            let current_hash = compute_hash(&new_content);
                             let last_hash = *state.last_saved_hash.read().await;
 
                             // Se a hash for diferente, é uma alteração externa legítima!
@@ -65,8 +67,8 @@ pub fn start_file_watcher(state: AppState) -> anyhow::Result<()> {
                                     "  [sync] External change detected and broadcast to browser."
                                 );
                             }
-                        });
-                    }
+                        }
+                    });
                 }
                 Err(e) => {
                     eprintln!("Watcher error: {e}");

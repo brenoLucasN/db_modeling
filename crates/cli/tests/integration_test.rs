@@ -25,12 +25,13 @@ async fn test_state_creation_and_atomic_write() {
     let layout_json = r#"{"tables":{"users":{"x":100,"y":100}}}"#.to_string();
     state.save_layout(layout_json.clone()).await.unwrap();
 
-    let layout_on_disk = tokio::fs::read_to_string(&state.layout_path).await.unwrap();
+    let lp = state.layout_path.read().await.clone();
+    let layout_on_disk = tokio::fs::read_to_string(&lp).await.unwrap();
     assert_eq!(layout_on_disk, layout_json);
 
     // Limpeza
     let _ = tokio::fs::remove_file(&test_file).await;
-    let _ = tokio::fs::remove_file(&state.layout_path).await;
+    let _ = tokio::fs::remove_file(&lp).await;
 }
 
 #[tokio::test]

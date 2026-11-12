@@ -55,6 +55,7 @@ export class DbmlCustomEditorProvider implements vscode.CustomTextEditorProvider
       }
     }
 
+    const sessionKey = `dbmodeling.docSession:${document.uri.toString()}`;
     const title = () => vscode.workspace.asRelativePath(document.uri, false);
     const sendUpdate = async (withLayout: boolean) => {
       webview.postMessage({
@@ -63,6 +64,7 @@ export class DbmlCustomEditorProvider implements vscode.CustomTextEditorProvider
         layout: withLayout ? layoutData : undefined,
         title: title(),
         files: await listDbmlFiles(document.uri),
+        session: withLayout ? this.context.workspaceState.get(sessionKey) : undefined,
       });
     };
 
@@ -157,6 +159,10 @@ export class DbmlCustomEditorProvider implements vscode.CustomTextEditorProvider
         }
         case 'new_file': {
           await vscode.commands.executeCommand('dbmodeling.newFile');
+          break;
+        }
+        case 'save_session': {
+          await this.context.workspaceState.update(sessionKey, message.session);
           break;
         }
         case 'ready': {

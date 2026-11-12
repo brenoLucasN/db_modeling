@@ -124,6 +124,7 @@ pub struct Shell {
     dragging_window: bool,
     ui_scale: f32,
     inspector_auto_hide: bool,
+    restoring_session: bool,
 }
 
 impl Focusable for Shell {
@@ -242,6 +243,7 @@ impl Shell {
             dragging_window: false,
             ui_scale: crate::settings::load().ui_scale,
             inspector_auto_hide: crate::settings::load().inspector_auto_hide,
+            restoring_session: false,
         };
         // DBM_PANE: painel inicial (usado pelo harness de screenshot)
         this.pane = match std::env::var("DBM_PANE").as_deref() {
@@ -253,10 +255,7 @@ impl Shell {
         match start {
             Some(p) if p.is_dir() => this.set_project(p, window, cx),
             Some(p) => this.open_path(p, window, cx),
-            None => {
-                let text = include_str!("../assets/sample.dbml").to_string();
-                this.add_doc(text, None, "example.dbml".into(), window, cx);
-            }
+            None => this.restore_session(window, cx),
         }
         // DBM_SELECT: tabela pré-selecionada (harness de screenshot)
         if let Some(t) = preselect {
@@ -322,6 +321,7 @@ impl Shell {
                     this.save_prefs();
                 }
                 this.last_summary = Some(sum);
+                this.save_session(cx);
                 cx.notify();
             }
         });
@@ -368,6 +368,7 @@ impl Shell {
             .position(|d| d.path.as_ref() == Some(&path))
         {
             self.active = i;
+            self.save_session(cx);
             cx.notify();
             return;
         }
@@ -375,6 +376,7 @@ impl Shell {
             Ok(text) => {
                 let title = file_title(&path);
                 self.add_doc(text, Some(path), title, window, cx);
+                self.save_session(cx);
             }
             Err(e) => window.push_notification(format!("Could not open file: {e}"), cx),
         }
@@ -389,7 +391,105 @@ impl Shell {
         if let Some(first) = self.files.first().cloned() {
             self.open_path(first, window, cx);
         }
+        self.save_session(cx);
         cx.notify();
+    }
+
+    fn restore_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let session = crate::session::load();
+        self.restoring_session = true;
+
+        if let Some(dir) = session.project_dir.filter(|d| d.is_dir()) {
+            self.files = scan(&dir);
+            self.project = Some(dir);
+        }
+
+        for path in &session.open_tabs {
+            if path.is_file() {
+                self.open_path(path.clone(), window, cx);
+                if let Some(vp) = session.viewports.get(path)
+                    && let Some(doc) = self.docs.last()
+                {
+                    doc.diagram.update(cx, |d, _| {
+                        d.set_viewport(vp.zoom, (vp.pan_x, vp.pan_y));
+                    });
+                }
+            }
+        }
+
+        if self.docs.is_empty()
+            && self.project.is_some()
+            && let Some(first) = self.files.first().cloned()
+        {
+            self.open_path(first, window, cx);
+        }
+
+        if let Some(active_path) = session.active_file.as_ref()
+            && let Some(idx) = self
+                .docs
+                .iter()
+                .position(|d| d.path.as_ref() == Some(active_path))
+        {
+            self.active = idx;
+        }
+
+        if std::env::var("DBM_PANE").is_err()
+            && let Some(pane) = session.pane.as_deref()
+        {
+            self.pane = match pane {
+                "files" => Pane::Files,
+                "problems" => Pane::Problems,
+                _ => Pane::Schema,
+            };
+        }
+
+        if std::env::var("DBM_EDITOR").is_err()
+            && let Some(ed) = session.editor_open
+        {
+            self.editor_open = ed;
+        }
+
+        self.restoring_session = false;
+
+        if self.docs.is_empty() && self.project.is_none() {
+            let text = include_str!("../assets/sample.dbml").to_string();
+            self.add_doc(text, None, "example.dbml".into(), window, cx);
+        }
+    }
+
+    fn save_session(&self, cx: &App) {
+        if self.restoring_session {
+            return;
+        }
+        let open_tabs: Vec<PathBuf> = self.docs.iter().filter_map(|d| d.path.clone()).collect();
+        let active_file = self.doc().and_then(|d| d.path.clone());
+        let pane = Some(
+            match self.pane {
+                Pane::Files => "files",
+                Pane::Schema => "schema",
+                Pane::Problems => "problems",
+            }
+            .to_string(),
+        );
+        let mut viewports = std::collections::BTreeMap::new();
+        for doc in &self.docs {
+            if let Some(path) = &doc.path {
+                let (zoom, pan_x, pan_y) = doc.diagram.read(cx).viewport();
+                viewports.insert(
+                    path.clone(),
+                    crate::session::ViewportState { zoom, pan_x, pan_y },
+                );
+            }
+        }
+        crate::session::save(&crate::session::SessionState {
+            version: 1,
+            project_dir: self.project.clone(),
+            open_tabs,
+            active_file,
+            pane,
+            editor_open: Some(self.editor_open),
+            viewports,
+        });
     }
 
     fn with_diagram(&mut self, cx: &mut Context<Self>, f: impl FnOnce(&mut Diagram)) {
@@ -486,6 +586,7 @@ impl Shell {
                 if let Some(dir) = self.project.clone() {
                     self.files = scan(&dir);
                 }
+                self.save_session(cx);
             }
             Err(e) => window.push_notification(format!("Could not save file: {e}"), cx),
         }
@@ -503,6 +604,7 @@ impl Shell {
         } else if i < self.active {
             self.active -= 1;
         }
+        self.save_session(cx);
         cx.notify();
     }
 
@@ -513,6 +615,7 @@ impl Shell {
     fn next_tab(&mut self, _: &NextTab, _: &mut Window, cx: &mut Context<Self>) {
         if !self.docs.is_empty() {
             self.active = (self.active + 1) % self.docs.len();
+            self.save_session(cx);
             cx.notify();
         }
     }
@@ -520,6 +623,7 @@ impl Shell {
     fn prev_tab(&mut self, _: &PrevTab, _: &mut Window, cx: &mut Context<Self>) {
         if !self.docs.is_empty() {
             self.active = (self.active + self.docs.len() - 1) % self.docs.len();
+            self.save_session(cx);
             cx.notify();
         }
     }
@@ -547,6 +651,7 @@ impl Shell {
             }
         }
         self.save_prefs();
+        self.save_session(cx);
         cx.notify();
     }
 
@@ -959,6 +1064,7 @@ impl Shell {
     fn apply_appearance(&mut self, cx: &mut Context<Self>) {
         apply_theme_scaled(self.mode, self.ui_scale, cx);
         self.save_prefs();
+        self.save_session(cx);
         cx.notify();
     }
 
@@ -1008,6 +1114,7 @@ impl Shell {
         self.col_type_w = d.col_type_w;
         self.panels_gen += 1;
         self.save_prefs();
+        self.save_session(cx);
         cx.notify();
     }
 
@@ -1019,6 +1126,7 @@ impl Shell {
     ) {
         self.translucent_cards = !self.translucent_cards;
         self.save_prefs();
+        self.save_session(cx);
         cx.notify();
     }
 
@@ -1034,12 +1142,14 @@ impl Shell {
             self.editor_open = false;
         }
         self.save_prefs();
+        self.save_session(cx);
         cx.notify();
     }
 
     fn toggle_inspector(&mut self, _: &ToggleInspector, _: &mut Window, cx: &mut Context<Self>) {
         self.inspector_open = !self.inspector_open;
         self.save_prefs();
+        self.save_session(cx);
         cx.notify();
     }
 
@@ -1115,6 +1225,7 @@ impl Shell {
                     })
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.active = i;
+                        this.save_session(cx);
                         cx.notify();
                     }))
                     // clique do meio fecha a aba (como em navegadores e no Zed)

@@ -13,6 +13,7 @@ import {
   SidecarLayout,
   TextPatch,
   WorkspaceFileEntry,
+  SessionSnapshot,
 } from './types';
 import {
   CARD_W,
@@ -113,6 +114,7 @@ export class Workbench {
   private paletteIdx = 0;
   private focusCol: [string, string] | null = null;
   private pendingNew: string | null = null;
+  private sessionTimer: number | null = null;
   private colResize: { x: number; w: number } | null = null;
   private saveTimer: number | null = null;
   private raf: number | null = null;
@@ -213,16 +215,59 @@ export class Workbench {
     }
   }
 
+  private sessionKey(): string {
+    return `dbmodeling.session:${this.title || 'default'}`;
+  }
+
+  private loadDocSession(): SessionSnapshot | null {
+    const hostSession = this.transport.getSession?.();
+    if (hostSession) return hostSession;
+    try {
+      const raw = localStorage.getItem(this.sessionKey());
+      return raw ? (JSON.parse(raw) as SessionSnapshot) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private saveDocSession(): void {
+    const snap: SessionSnapshot = {
+      pane: this.pane,
+      editorOpen: this.editorOpen,
+      zoom: this.zoom,
+      pan: { x: this.pan.x, y: this.pan.y },
+    };
+    try {
+      localStorage.setItem(this.sessionKey(), JSON.stringify(snap));
+    } catch {
+      /* ignorado */
+    }
+    this.transport.saveSession?.(snap);
+  }
+
+  private scheduleSessionSave(): void {
+    if (this.sessionTimer !== null) window.clearTimeout(this.sessionTimer);
+    this.sessionTimer = window.setTimeout(() => {
+      this.sessionTimer = null;
+      this.saveDocSession();
+    }, 150);
+  }
+
   // ───────────────────────── documento / análise ─────────────────────────
 
   private setDocument(
     source: string,
     layout?: SidecarLayout,
-    meta?: { title?: string; files?: WorkspaceFileEntry[] }
+    meta?: { title?: string; files?: WorkspaceFileEntry[]; session?: SessionSnapshot }
   ): void {
+    const titleChanged = !!(meta?.title && meta.title !== this.title);
     if (meta?.title) this.title = meta.title;
     if (meta?.files) this.files = meta.files;
-    const first = this.source === '' && !this.scene;
+    const first = (this.source === '' && !this.scene) || titleChanged;
+    if (titleChanged) {
+      this.positions = {};
+      this.needsFit = true;
+    }
     if (layout) {
       this.extraLayout = layout;
       if (layout.tables && (first || Object.keys(this.positions).length === 0)) {
@@ -232,6 +277,29 @@ export class Workbench {
         this.zoom = layout.viewport.zoom;
         this.pan = { x: layout.viewport.pan_x, y: layout.viewport.pan_y };
         this.needsFit = false;
+      }
+    }
+    if (first) {
+      const session = meta?.session ?? this.loadDocSession();
+      if (session) {
+        if (session.pane === 'files' || session.pane === 'schema' || session.pane === 'problems') {
+          this.pane = session.pane;
+        }
+        if (typeof session.editorOpen === 'boolean') {
+          this.editorOpen = session.editorOpen;
+        }
+        if (
+          typeof session.zoom === 'number' &&
+          Number.isFinite(session.zoom) &&
+          session.zoom > 0 &&
+          session.pan &&
+          Number.isFinite(session.pan.x) &&
+          Number.isFinite(session.pan.y)
+        ) {
+          this.zoom = session.zoom;
+          this.pan = { x: session.pan.x, y: session.pan.y };
+          this.needsFit = false;
+        }
       }
     }
     if (source === this.source && !first) {
@@ -398,6 +466,7 @@ export class Workbench {
     this.zoom = z;
     this.pan = { x: (r.width - w * z) / 2 - x0 * z, y: (r.height - h * z) / 2 - y0 * z + 14 };
     this.needsFit = false;
+    this.scheduleSessionSave();
   }
 
   private zoomAt(cx: number, cy: number, factor: number): void {
@@ -405,6 +474,7 @@ export class Workbench {
     const k = z / this.zoom;
     this.pan = { x: cx - (cx - this.pan.x) * k, y: cy - (cy - this.pan.y) * k };
     this.zoom = z;
+    this.scheduleSessionSave();
   }
 
   private toWorld(e: { clientX: number; clientY: number }): Pt {
@@ -838,6 +908,7 @@ export class Workbench {
       case 'ToggleEditor':
         this.editorOpen = !this.editorOpen;
         if (this.editorOpen) setTimeout(() => this.els['code'].focus(), 0);
+        this.saveDocSession();
         break;
       case 'ToggleSidebar': this.prefs.sidebar = !this.prefs.sidebar; break;
       case 'ToggleInspector': this.prefs.inspector = !this.prefs.inspector; break;
@@ -909,6 +980,7 @@ export class Workbench {
     this.pane = p;
     this.prefs.sidebar = true;
     this.savePrefs();
+    this.saveDocSession();
     this.renderChrome();
   }
 
@@ -1335,6 +1407,10 @@ export class Workbench {
     const d = this.drag;
     if (!d) return;
     this.drag = null;
+    if (d.kind === 'pan') {
+      this.scheduleSessionSave();
+      return;
+    }
     if (d.kind === 'marquee') {
       const x0 = Math.min(d.start.x, d.now.x), x1 = Math.max(d.start.x, d.now.x);
       const y0 = Math.min(d.start.y, d.now.y), y1 = Math.max(d.start.y, d.now.y);
