@@ -1,7 +1,7 @@
 ---
-status: proposta
+status: accepted
 ---
 
-# Núcleo sem dependência de UI
+# Core free of UI dependencies
 
-Só o crate `app` depende de GPUI; parser, análise, edição, layout, cena e export são Rust puro. Motivo: testes rápidos e headless, e reaproveitamento (CLI, LSP standalone).
+Only the `app` crate depends on GPUI; parser, analysis, editing, layout, scene, and Wasm bindings are pure Rust. Reason: fast headless testing and code reuse across targets (CLI, WebAssembly, VS Code extension).

@@ -1,11 +1,11 @@
 ---
-status: aceita
+status: accepted
 ---
 
-# Escopo: só modelagem visual
+# Scope: visual modeling only
 
-O produto não conecta nem lê bancos e não faz SQL (export, import ou migrações). Exports são PNG, JPEG e Mermaid `erDiagram`. Alvos: Windows 10/11 e Ubuntu 22.04/24.04; macOS fora por ora.
+The product does not connect to or read live databases and does not execute SQL (export, import, or migrations). Diagram exports are PNG and SVG. Targets: Windows 10/11, Ubuntu 22.04/24.04, Fedora, and macOS.
 
-## Consequências
+## Consequences
 
-Stack menor (sem `sqlparser`/`sqlx`); o catálogo de tipos é genérico, não amarrado a dialeto; o investimento vai para canvas, edição e export.
+Smaller stack (no `sqlparser`/`sqlx`); the type catalog is generic rather than tied to a single SQL dialect; engineering investment goes into the canvas, bidirectional editing, and export quality.

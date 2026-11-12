@@ -51,14 +51,14 @@ const TYPES: [&str; 14] = [
 ];
 
 const SETTINGS: [(&str, &str, &str); 8] = [
-    ("pk", "pk", "chave primária"),
-    ("not null", "not null", "obrigatória"),
-    ("unique", "unique", "valor único"),
-    ("increment", "increment", "autoincremento"),
-    ("default", "default: ", "valor padrão"),
-    ("note", "note: ''", "comentário"),
-    ("ref", "ref: > ", "chave estrangeira"),
-    ("null", "null", "aceita nulo"),
+    ("pk", "pk", "primary key"),
+    ("not null", "not null", "required"),
+    ("unique", "unique", "unique value"),
+    ("increment", "increment", "auto-increment"),
+    ("default", "default: ", "default value"),
+    ("note", "note: ''", "comment"),
+    ("ref", "ref: > ", "foreign key"),
+    ("null", "null", "nullable"),
 ];
 
 /// Retorna sugestões para o cursor em `offset` (bytes). O prefixo já digitado filtra a lista.
@@ -91,7 +91,7 @@ pub fn complete(text: &str, offset: usize) -> Vec<Completion> {
                     &t.name,
                     &t.name,
                     CompletionKind::Table,
-                    &format!("{} colunas", t.columns.len()),
+                    &format!("{} columns", t.columns.len()),
                 );
                 c.replace = offset - word.len()..offset;
                 c
@@ -128,7 +128,7 @@ pub fn complete(text: &str, offset: usize) -> Vec<Completion> {
                             &t.name,
                             &format!("{}.", t.name),
                             CompletionKind::Table,
-                            "tabela",
+                            "table",
                         )
                     })
                     .collect(),
@@ -141,26 +141,26 @@ pub fn complete(text: &str, offset: usize) -> Vec<Completion> {
         } else if depth > 0 && ctx.split_whitespace().count() == 1 {
             TYPES
                 .iter()
-                .map(|t| item(t, t, CompletionKind::Type, "tipo"))
+                .map(|t| item(t, t, CompletionKind::Type, "type"))
                 .collect()
         } else if depth <= 0 && ctx.trim().is_empty() {
             vec![
-                item("Table", "Table ", CompletionKind::Keyword, "nova tabela"),
-                item("Ref", "Ref: ", CompletionKind::Keyword, "nova relação"),
-                item("Enum", "Enum ", CompletionKind::Keyword, "enumeração"),
+                item("Table", "Table ", CompletionKind::Keyword, "new table"),
+                item("Ref", "Ref: ", CompletionKind::Keyword, "new relation"),
+                item("Enum", "Enum ", CompletionKind::Keyword, "enumeration"),
                 item(
                     "TableGroup",
                     "TableGroup ",
                     CompletionKind::Keyword,
-                    "grupo de tabelas",
+                    "table group",
                 ),
                 item(
                     "Project",
                     "Project ",
                     CompletionKind::Keyword,
-                    "metadados do projeto",
+                    "project metadata",
                 ),
-                item("Note", "Note: ", CompletionKind::Keyword, "nota"),
+                item("Note", "Note: ", CompletionKind::Keyword, "note"),
             ]
         } else {
             Vec::new()

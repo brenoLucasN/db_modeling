@@ -84,7 +84,7 @@ export class Workbench {
   private wasm: any;
 
   private source = '';
-  private title = 'exemplo.dbml';
+  private title = 'example.dbml';
   private files: WorkspaceFileEntry[] = [];
   private schema: Schema = { tables: [], refs: [], groups: [] };
   private lastValid: Schema | null = null;
@@ -149,8 +149,8 @@ export class Workbench {
         <div class="sidebar ui" id="sidebar"></div>
         <div class="editor ui" id="editor">
           <div class="eh"><span id="ed-icon"></span><span class="t" id="ed-title"></span>
-            <button class="ib" data-act="FormatDocument" title="Formatar documento (Alt+Shift+F)">${ICON('Sparkles', 14)}</button>
-            <button class="ib" data-act="ToggleEditor" title="Fechar editor (Ctrl+E)">${ICON('X', 14)}</button></div>
+            <button class="ib" data-act="FormatDocument" title="Format Document (Alt+Shift+F)">${ICON('Sparkles', 14)}</button>
+            <button class="ib" data-act="ToggleEditor" title="Close Editor (Ctrl+E)">${ICON('X', 14)}</button></div>
           <div class="body"><div class="gutter" id="gutter"></div><textarea class="code" id="code" spellcheck="false"></textarea></div>
         </div>
         <div class="surface" id="surface" tabindex="0">
@@ -158,21 +158,21 @@ export class Workbench {
           <div class="marquee" id="marquee"></div>
           <div class="empty" id="empty">
             <div style="color:var(--faint)">${ICON('Table2', 28)}</div>
-            <h3>Nenhuma tabela ainda</h3>
-            <p>Escreva o esquema em DBML no editor ou crie uma nova tabela.</p>
-            <button class="btn" data-act="ToggleEditor">${ICON('Braces', 14)} Abrir editor DBML</button>
-            <button class="btn primary" data-act="NewTable">${ICON('Plus', 14)} Nova tabela</button>
+            <h3>No tables yet</h3>
+            <p>Write your DBML schema in the editor or create a new table.</p>
+            <button class="btn" data-act="ToggleEditor">${ICON('Braces', 14)} Open DBML Editor</button>
+            <button class="btn primary" data-act="NewTable">${ICON('Plus', 14)} New Table</button>
           </div>
           <div class="island tools ui" id="tools"></div>
           <div class="island zoomi ui" id="zoomi"></div>
-          <div class="island helpi ui" id="helpi"><button class="ib" data-act="ToggleLegend" title="Legenda (Ctrl+Shift+L)">${ICON('Info', 16)}</button></div>
+          <div class="island helpi ui" id="helpi"><button class="ib" data-act="ToggleLegend" title="Legend (Ctrl+Shift+L)">${ICON('Info', 16)}</button></div>
           <div class="legend ui" id="legend">
-            <h4>Legenda</h4>
-            <div><span style="color:var(--accent)">${ICON('KeyRound', 13)}</span> PK · chave primária</div>
-            <div><span style="color:var(--accent)">${ICON('Link2', 13)}</span> FK · chave estrangeira (id_tabela)</div>
-            <div><span>${ICON('Link2', 13)}</span> Relação (coluna → coluna)</div>
-            <div><b>N · 1</b> Cardinalidade</div>
-            <div><span style="color:var(--accent)">■</span> Tabela selecionada e suas relações</div>
+            <h4>Legend</h4>
+            <div><span style="color:var(--accent)">${ICON('KeyRound', 13)}</span> PK · primary key</div>
+            <div><span style="color:var(--accent)">${ICON('Link2', 13)}</span> FK · foreign key (id_table)</div>
+            <div><span>${ICON('Link2', 13)}</span> Relation (column → column)</div>
+            <div><b>N · 1</b> Cardinality</div>
+            <div><span style="color:var(--accent)">■</span> Selected table and its relations</div>
           </div>
         </div>
         <div class="inspector ui" id="inspector"></div>
@@ -260,7 +260,7 @@ export class Workbench {
         if (!hasError || r.schema.tables.length > 0) this.lastValid = r.schema;
       }
     } catch (e) {
-      console.error('Erro ao analisar DBML via Wasm:', e);
+      console.error('Error analyzing DBML via Wasm:', e);
     }
     this.selection = this.selection.filter((n) => this.schema.tables.some((t) => t.name === n));
     this.computeScene();
@@ -283,7 +283,7 @@ export class Workbench {
         if (!this.positions[k]) this.positions[k] = this.scene!.positions[k];
       }
     } catch (e) {
-      console.error('Erro em compute_scene:', e);
+      console.error('Error in compute_scene:', e);
     }
     this.pendingNew = null;
   }
@@ -362,7 +362,7 @@ export class Workbench {
       this.queueSaveLayout();
       this.scheduleRender();
     } catch (e) {
-      console.error('Erro no auto-layout:', e);
+      console.error('Error in auto-layout:', e);
     }
   }
 
@@ -558,7 +558,7 @@ export class Workbench {
         <div class="head" style="${tint ? `background:${hexWithAlpha(tint, 0.08)}` : ''}"><div class="ic" style="${tint ? `color:${tint}` : ''}">${ICON('Table2', 14)}</div>
         <div class="nm">${esc(t.name)}</div><div class="cnt">${t.columns.length}</div></div>
         <div class="rows">${rows}</div>
-        <div class="plus" data-addcol="${esc(t.name)}" title="Adicionar coluna">${ICON('Plus', 14)}</div></div>`;
+        <div class="plus" data-addcol="${esc(t.name)}" title="Add column">${ICON('Plus', 14)}</div></div>`;
     }
     w.innerHTML = html;
     // marquee
@@ -588,11 +588,11 @@ export class Workbench {
     this.els['titlebar'].innerHTML = `
       <span style="color:var(--accent)">${ICON('Database', 16)}</span>
       <div class="doc">${ICON('Braces', 13)}<span>${esc(this.title)}</span></div>
-      ${this.btn('NewFile', 'Plus', 'Novo arquivo .dbml (Ctrl+N)')}
+      ${this.btn('NewFile', 'Plus', 'New .dbml File (Ctrl+N)')}
       <div class="spacer"></div>
-      <button class="pill" data-act="OpenPalette">${ICON('Search', 14)}<span>DB Modeling — Ctrl+K comandos</span></button>
+      <button class="pill" data-act="OpenPalette">${ICON('Search', 14)}<span>DB Modeling — Ctrl+K commands</span></button>
       <div class="spacer"></div>
-      ${this.btn('ToggleTheme', this.prefs.mode === 'dark' ? 'Moon' : 'Sun', 'Alternar tema (Ctrl+T)')}`;
+      ${this.btn('ToggleTheme', this.prefs.mode === 'dark' ? 'Moon' : 'Sun', 'Toggle Theme (Ctrl+T)')}`;
   }
 
   private errorCount(): number {
@@ -603,46 +603,46 @@ export class Workbench {
     const errs = this.errorCount();
     const sb = this.prefs.sidebar;
     this.els['rail-left'].innerHTML = `
-      ${this.btn('ShowFiles', 'Folder', 'Arquivos (Ctrl+Shift+E)', sb && this.pane === 'files')}
-      ${this.btn('ShowSchema', 'Table2', 'Esquema (Ctrl+Shift+D)', sb && this.pane === 'schema')}
-      <button class="ib ${sb && this.pane === 'problems' ? 'on' : ''}" data-act="ShowProblems" title="Problemas (Ctrl+Shift+M)">${ICON('TriangleAlert', 16)}${errs ? `<span class="badge">${errs}</span>` : ''}</button>
-      ${this.btn('ToggleEditor', 'Braces', 'Editor DBML (Ctrl+E)', this.editorOpen)}
+      ${this.btn('ShowFiles', 'Folder', 'Files (Ctrl+Shift+E)', sb && this.pane === 'files')}
+      ${this.btn('ShowSchema', 'Table2', 'Schema (Ctrl+Shift+D)', sb && this.pane === 'schema')}
+      <button class="ib ${sb && this.pane === 'problems' ? 'on' : ''}" data-act="ShowProblems" title="Problems (Ctrl+Shift+M)">${ICON('TriangleAlert', 16)}${errs ? `<span class="badge">${errs}</span>` : ''}</button>
+      ${this.btn('ToggleEditor', 'Braces', 'DBML Editor (Ctrl+E)', this.editorOpen)}
       <div class="grow"></div>
-      <button class="ib" data-act="menu:appearance" title="Aparência">${ICON('Palette', 16)}</button>
-      ${this.btn('ShowShortcuts', 'Keyboard', 'Atalhos de teclado (Ctrl+/)')}
-      ${this.btn('OpenPalette', 'Command', 'Paleta de comandos (Ctrl+K)')}`;
+      <button class="ib" data-act="menu:appearance" title="Appearance">${ICON('Palette', 16)}</button>
+      ${this.btn('ShowShortcuts', 'Keyboard', 'Keyboard Shortcuts (Ctrl+/)')}
+      ${this.btn('OpenPalette', 'Command', 'Command Palette (Ctrl+K)')}`;
     this.els['rail-right'].innerHTML = `
       <button class="ib ${this.prefs.inspector ? 'on' : ''}" data-act="ToggleInspector" title="Inspector (Ctrl+I)">${ICON('SlidersHorizontal', 16)}${this.selection.length ? '<span class="badge">1</span>' : ''}</button>
-      ${this.btn('ToggleLegend', 'Info', 'Legenda (Ctrl+Shift+L)', this.prefs.legend)}`;
+      ${this.btn('ToggleLegend', 'Info', 'Legend (Ctrl+Shift+L)', this.prefs.legend)}`;
   }
 
   private renderIslands(): void {
     this.els['tools'].innerHTML = `
-      ${this.btn('ToolSelect', 'MousePointer2', 'Selecionar (V)', this.tool === 'select')}
-      ${this.btn('ToolHand', 'Hand', 'Mão: mover a vista (H)', this.tool === 'hand')}
+      ${this.btn('ToolSelect', 'MousePointer2', 'Select (V)', this.tool === 'select')}
+      ${this.btn('ToolHand', 'Hand', 'Hand: pan view (H)', this.tool === 'hand')}
       <div class="sep"></div>
-      ${this.btn('NewTable', 'Plus', 'Nova tabela (T)')}
+      ${this.btn('NewTable', 'Plus', 'New Table (T)')}
       <div class="sep"></div>
-      ${this.btn('Relayout', 'LayoutGrid', 'Reorganizar automaticamente (Ctrl+L)')}
-      ${this.btn('FitView', 'Scan', 'Ajustar à tela (Shift+1)')}
+      ${this.btn('Relayout', 'LayoutGrid', 'Auto-Layout (Ctrl+L)')}
+      ${this.btn('FitView', 'Scan', 'Fit to Screen (Shift+1)')}
       <div class="sep"></div>
-      ${this.btn('ToggleEditor', 'Braces', 'Editor DBML (Ctrl+E)', this.editorOpen)}
-      <button class="ib" data-act="menu:export" title="Exportar">${ICON('Download', 16)}</button>`;
-    this.els['zoomi'].innerHTML = `${this.btn('ZoomOut', 'ZoomOut', 'Reduzir (Ctrl+-)')}
-      <button class="pct" data-act="FitView" title="Ajustar à tela">${Math.round(this.zoom * 100)}%</button>
-      ${this.btn('ZoomIn', 'ZoomIn', 'Ampliar (Ctrl+=)')}`;
+      ${this.btn('ToggleEditor', 'Braces', 'DBML Editor (Ctrl+E)', this.editorOpen)}
+      <button class="ib" data-act="menu:export" title="Export">${ICON('Download', 16)}</button>`;
+    this.els['zoomi'].innerHTML = `${this.btn('ZoomOut', 'ZoomOut', 'Zoom Out (Ctrl+-)')}
+      <button class="pct" data-act="FitView" title="Fit to Screen">${Math.round(this.zoom * 100)}%</button>
+      ${this.btn('ZoomIn', 'ZoomIn', 'Zoom In (Ctrl+=)')}`;
   }
 
   private hint(): string {
     const d = this.drag;
-    if (d?.kind === 'cards') return `Movendo ${this.selection.join(', ')}`;
-    if (d?.kind === 'group') return `Movendo o grupo ${d.name}`;
-    if (d?.kind === 'link') return `Relação a partir de ${d.table}.${d.col}: solte sobre a tabela de destino`;
-    if (d?.kind === 'marquee') return 'Solte para selecionar as tabelas dentro do retângulo';
-    if (this.selectedRef) return 'Relação selecionada · Delete exclui a linha e a coluna FK · Esc limpa a seleção';
-    if (this.selection.length > 1) return `${this.selection.length} tabelas selecionadas · Ctrl+G agrupa`;
-    if (this.selection.length === 1) return `${this.selection[0]} · F2 renomeia · Del exclui`;
-    return 'Clique numa tabela para ver detalhes · arraste o fundo para selecionar · roda para mover · Ctrl+roda para zoom';
+    if (d?.kind === 'cards') return `Moving ${this.selection.join(', ')}`;
+    if (d?.kind === 'group') return `Moving group ${d.name}`;
+    if (d?.kind === 'link') return `Relation from ${d.table}.${d.col}: drop on target table`;
+    if (d?.kind === 'marquee') return 'Release to select tables inside rectangle';
+    if (this.selectedRef) return 'Relation selected · Delete removes line and FK column · Esc clears selection';
+    if (this.selection.length > 1) return `${this.selection.length} tables selected · Ctrl+G groups`;
+    if (this.selection.length === 1) return `${this.selection[0]} · F2 renames · Del deletes`;
+    return 'Click a table to view details · drag background to select · scroll to pan · Ctrl+scroll to zoom';
   }
 
   private renderStatus(): void {
@@ -651,9 +651,9 @@ export class Workbench {
     this.els['status'].innerHTML = `
       <button data-act="ShowProblems"><span style="color:${errs ? 'var(--danger)' : 'var(--faint)'}">${ICON('CircleX', 12)}</span> ${errs}
         <span style="color:${warns ? 'var(--warning)' : 'var(--faint)'}">${ICON('TriangleAlert', 12)}</span> ${warns}</button>
-      <span>${this.schema.tables.length} tabelas · ${this.schema.refs.length} relações</span>
+      <span>${this.schema.tables.length} tables · ${this.schema.refs.length} relations</span>
       <span class="hint">${esc(this.hint())}</span>
-      <span>Zoom ${Math.round(this.zoom * 100)}%</span><span>DBML</span><span>${this.prefs.mode === 'dark' ? 'Escuro' : 'Claro'}</span>`;
+      <span>Zoom ${Math.round(this.zoom * 100)}%</span><span>DBML</span><span>${this.prefs.mode === 'dark' ? 'Dark' : 'Light'}</span>`;
   }
 
   private renderSidebar(): void {
@@ -666,9 +666,9 @@ export class Workbench {
           <span style="color:${f.active ? 'var(--accent)' : 'var(--faint)'}">${ICON('Database', 14)}</span><span class="g">${esc(f.name)}</span><span class="c">DBML</span></div>`
             )
             .join('')
-        : `<div class="pad">Nenhum arquivo .dbml encontrado no workspace.</div>`;
-      el.innerHTML = `<div class="sec"><span>ARQUIVOS</span><span>${this.files.length}</span></div>${list}
-        <div style="padding:12px"><button class="btn primary" data-act="NewFile">${ICON('Plus', 14)} Novo arquivo</button></div>`;
+        : `<div class="pad">No .dbml files found in workspace.</div>`;
+      el.innerHTML = `<div class="sec"><span>FILES</span><span>${this.files.length}</span></div>${list}
+        <div style="padding:12px"><button class="btn primary" data-act="NewFile">${ICON('Plus', 14)} New File</button></div>`;
     } else if (this.pane === 'schema') {
       const row = (name: string, cnt: number, pad = 0): string => {
         const t = this.tint(name);
@@ -685,13 +685,13 @@ export class Workbench {
         }
       }
       const loose = this.schema.tables.filter((t) => !grouped.has(t.name));
-      if (grouped.size && loose.length) body += `<div class="gh" style="color:var(--faint)">Sem grupo</div>`;
+      if (grouped.size && loose.length) body += `<div class="gh" style="color:var(--faint)">No group</div>`;
       for (const t of loose) body += row(t.name, t.columns.length);
       const refs = this.schema.refs
         .map((r) => `<div class="rel"><span style="color:var(--faint)">${ICON('Link2', 12)}</span><span class="tx">${esc(r.from.table)} → ${esc(r.to.table)}</span></div>`)
         .join('');
-      el.innerHTML = `<div class="sec"><span>TABELAS</span><span>${this.schema.tables.length}</span></div>${body}
-        <div class="sec"><span>RELAÇÕES</span><span>${this.schema.refs.length}</span></div>${refs}`;
+      el.innerHTML = `<div class="sec"><span>TABLES</span><span>${this.schema.tables.length}</span></div>${body}
+        <div class="sec"><span>RELATIONS</span><span>${this.schema.refs.length}</span></div>${refs}`;
     } else {
       const items = this.diags
         .map((d, i) => {
@@ -699,11 +699,11 @@ export class Workbench {
             : d.severity === 'warning' ? (['TriangleAlert', 'var(--warning)'] as const)
             : (['Info', 'var(--faint)'] as const);
           return `<div class="prob" data-act="goto-diag" data-i="${i}"><span style="color:${col};padding-top:2px">${ICON(ic as IconName, 13)}</span>
-            <div><div>${esc(d.message)}</div><div class="sub">${esc(this.title)} · linha ${d.range.start.line + 1}</div></div></div>`;
+            <div><div>${esc(d.message)}</div><div class="sub">${esc(this.title)} · line ${d.range.start.line + 1}</div></div></div>`;
         })
         .join('');
-      el.innerHTML = `<div class="sec"><span>PROBLEMAS</span><span>${this.diags.length}</span></div>${
-        items || `<div class="pad" style="align-items:center"><span style="color:var(--ok)">${ICON('CircleCheck', 20)}</span>Nenhum problema encontrado.</div>`}`;
+      el.innerHTML = `<div class="sec"><span>PROBLEMS</span><span>${this.diags.length}</span></div>${
+        items || `<div class="pad" style="align-items:center"><span style="color:var(--ok)">${ICON('CircleCheck', 20)}</span>No problems found.</div>`}`;
     }
   }
 
@@ -718,28 +718,28 @@ export class Workbench {
     if (ae && el.contains(ae) && ae.tagName === 'INPUT' && !this.focusCol) return;
 
     if (sel.length > 1) {
-      el.innerHTML = `<div class="ihead"><span class="eb">SELEÇÃO</span><span class="ti">${sel.length} tabelas</span><span class="su">Shift+clique adiciona ou remove</span></div>
-        <div class="sec"><span>TABELAS</span></div>
+      el.innerHTML = `<div class="ihead"><span class="eb">SELECTION</span><span class="ti">${sel.length} tables</span><span class="su">Shift+click adds or removes</span></div>
+        <div class="sec"><span>TABLES</span></div>
         ${sel.map((n) => `<div class="rel"><span style="color:var(--faint)">${ICON('Table2', 12)}</span><span class="tx">${esc(n)}</span></div>`).join('')}
-        <div style="padding:12px"><button class="btn primary" style="width:100%;justify-content:center" data-act="GroupSelection">${ICON('LayoutGrid', 14)} Agrupar seleção</button></div>`;
+        <div style="padding:12px"><button class="btn primary" style="width:100%;justify-content:center" data-act="GroupSelection">${ICON('LayoutGrid', 14)} Group selection</button></div>`;
       return;
     }
     const t = sel.length === 1 ? this.schema.tables.find((x) => x.name === sel[0]) : undefined;
     if (!t) {
       const kb = (l: string, k: string) => `<div class="kb"><span>${l}</span><kbd>${k}</kbd></div>`;
       el.innerHTML = `<div class="pad"><div style="display:flex;justify-content:space-between;align-items:center">
-        <b style="font-size:14.5px;color:var(--text)">Nada selecionado</b>
-        <button class="ib" data-act="ToggleInspector" title="Ocultar inspector (Ctrl+I)">${ICON('PanelRightClose', 14)}</button></div>
-        <div>Clique numa tabela para ver colunas, cor, grupo e relações. Shift+clique seleciona várias.</div>
+        <b style="font-size:14.5px;color:var(--text)">Nothing selected</b>
+        <button class="ib" data-act="ToggleInspector" title="Hide inspector (Ctrl+I)">${ICON('PanelRightClose', 14)}</button></div>
+        <div>Click a table to view columns, color, group, and relations. Shift+click selects multiple.</div>
         <div style="height:1px;background:var(--edge);margin:6px 0"></div>
-        ${kb('Selecionar', 'V')}${kb('Mover a vista', 'H')}${kb('Ajustar à tela', 'Shift+1')}${kb('Agrupar seleção', 'Ctrl+G')}${kb('Editor DBML', 'Ctrl+E')}${kb('Todos os comandos', 'Ctrl+K')}</div>`;
+        ${kb('Select', 'V')}${kb('Pan view', 'H')}${kb('Fit to screen', 'Shift+1')}${kb('Group selection', 'Ctrl+G')}${kb('DBML Editor', 'Ctrl+E')}${kb('All commands', 'Ctrl+K')}</div>`;
       return;
     }
     const grp = this.schema.groups.find((g) => g.tables.includes(t.name));
     const refs = this.schema.refs.filter((r) => r.from.table === t.name || r.to.table === t.name);
     const cur = (t.color || '').toLowerCase();
     const sw = TABLE_COLORS.map(([l, h]) => `<button class="${cur === h ? 'on' : ''}" title="${l}" style="background:${h}" data-act="set-color" data-table="${esc(t.name)}" data-color="${h}"></button>`).join('') +
-      `<button class="none" title="Sem cor" data-act="set-color" data-table="${esc(t.name)}" data-color="">${ICON('X', 12)}</button>`;
+      `<button class="none" title="No color" data-act="set-color" data-table="${esc(t.name)}" data-color="">${ICON('X', 12)}</button>`;
     const tw = this.prefs.colTypeW;
     const fkSet = new Set(this.scene?.tables.find((x) => x.name === t.name)?.fk_columns || []);
     const cols = t.columns.map((c) => {
@@ -750,27 +750,27 @@ export class Workbench {
         <div class="t" style="width:${tw}px"><input class="fld muted" data-edit="coltype" data-table="${esc(t.name)}" data-col="${esc(c.name)}" data-orig="${esc(c.ty)}" value="${esc(c.ty)}"></div>
         ${[['PK', 'pk', c.pk], ['FK', 'fk', isFk], ['NN', 'not null', c.not_null], ['UQ', 'unique', c.unique]]
           .map(([l, f, on]) => `<button class="chip ${on ? 'on' : ''}" data-act="toggle-flag" data-table="${esc(t.name)}" data-col="${esc(c.name)}" data-flag="${f}" data-on="${on ? 1 : 0}">${l}</button>`).join('')}
-        <button class="del" data-act="del-col" data-table="${esc(t.name)}" data-col="${esc(c.name)}" title="Excluir coluna">${ICON('Trash', 13)}</button></div>`;
+        <button class="del" data-act="del-col" data-table="${esc(t.name)}" data-col="${esc(c.name)}" title="Delete column">${ICON('Trash', 13)}</button></div>`;
     }).join('');
     const rels = refs.map((r) => {
       const card = { ManyToOne: 'N:1', OneToMany: '1:N', OneToOne: '1:1', ManyToMany: 'N:N' }[r.kind];
-      return `<div class="rel"><span style="color:var(--faint)">${ICON('Link2', 12)}</span><span class="tx">${esc(r.from.table)}.${esc(r.from.column)} → ${esc(r.to.table)}.${esc(r.to.column)}</span><span class="tag">${card}</span><button class="ib" style="width:22px;height:22px" data-act="del-ref" data-from-table="${esc(r.from.table)}" data-from-col="${esc(r.from.column)}" data-to-table="${esc(r.to.table)}" data-to-col="${esc(r.to.column)}" title="Excluir relação e coluna FK">${ICON('Trash', 12)}</button></div>`;
+      return `<div class="rel"><span style="color:var(--faint)">${ICON('Link2', 12)}</span><span class="tx">${esc(r.from.table)}.${esc(r.from.column)} → ${esc(r.to.table)}.${esc(r.to.column)}</span><span class="tag">${card}</span><button class="ib" style="width:22px;height:22px" data-act="del-ref" data-from-table="${esc(r.from.table)}" data-from-col="${esc(r.from.column)}" data-to-table="${esc(r.to.table)}" data-to-col="${esc(r.to.column)}" title="Delete relation and FK column">${ICON('Trash', 12)}</button></div>`;
     }).join('');
     el.innerHTML = `
-      <div class="ihead"><span class="eb">TABELA</span>
+      <div class="ihead"><span class="eb">TABLE</span>
         <input class="fld big" id="insp-name" data-edit="table" data-table="${esc(t.name)}" data-orig="${esc(t.name)}" value="${esc(t.name)}">
-        <span class="su">${t.columns.length} colunas · F2 renomeia</span></div>
-      <div class="sec"><span>COR</span></div><div class="sw">${sw}</div>
-      <div class="sec"><span>GRUPO</span></div>
-      ${grp ? `<div class="rel"><span style="color:var(--faint)">${ICON('LayoutGrid', 12)}</span><span class="tx" style="color:var(--text)">${esc(grp.name)}</span><button class="btn ghost" style="height:22px" data-act="UngroupSelection">Desagrupar</button></div>`
-            : `<div class="rel" style="color:var(--faint)">Sem grupo · Shift+clique em outras tabelas e Ctrl+G para agrupar</div>`}
-      <div class="sec"><span>COLUNAS</span></div>
-      <div class="crow hd"><div class="n">NOME</div><div class="split" data-split="1" title="Arraste para redimensionar (duplo-clique restaura)"></div>
-        <div class="t" style="width:${tw}px">TIPO</div><div style="width:62px">FLAGS</div><div style="width:20px"></div></div>
+        <span class="su">${t.columns.length} columns · F2 to rename</span></div>
+      <div class="sec"><span>COLOR</span></div><div class="sw">${sw}</div>
+      <div class="sec"><span>GROUP</span></div>
+      ${grp ? `<div class="rel"><span style="color:var(--faint)">${ICON('LayoutGrid', 12)}</span><span class="tx" style="color:var(--text)">${esc(grp.name)}</span><button class="btn ghost" style="height:22px" data-act="UngroupSelection">Ungroup</button></div>`
+            : `<div class="rel" style="color:var(--faint)">No group · Shift+click other tables and press Ctrl+G to group</div>`}
+      <div class="sec"><span>COLUMNS</span></div>
+      <div class="crow hd"><div class="n">NAME</div><div class="split" data-split="1" title="Drag to resize (double-click to reset)"></div>
+        <div class="t" style="width:${tw}px">TYPE</div><div style="width:62px">FLAGS</div><div style="width:20px"></div></div>
       ${cols}
-      <div style="padding:8px 12px"><button class="btn ghost" data-act="add-col" data-table="${esc(t.name)}">${ICON('Plus', 14)} Adicionar coluna</button></div>
-      <div class="sec"><span>RELAÇÕES</span></div>${rels}
-      <div style="padding:12px;margin-top:8px;border-top:1px solid var(--edge-soft)"><button class="btn ghost" data-act="DeleteSelection">${ICON('Trash', 14)} Excluir tabela</button></div>`;
+      <div style="padding:8px 12px"><button class="btn ghost" data-act="add-col" data-table="${esc(t.name)}">${ICON('Plus', 14)} Add column</button></div>
+      <div class="sec"><span>RELATIONS</span></div>${rels}
+      <div style="padding:12px;margin-top:8px;border-top:1px solid var(--edge-soft)"><button class="btn ghost" data-act="DeleteSelection">${ICON('Trash', 14)} Delete table</button></div>`;
     if (this.focusCol) {
       const [ft, fc] = this.focusCol;
       this.focusCol = null;
@@ -916,12 +916,12 @@ export class Workbench {
     if (!this.transport.exportFile) return;
     try {
       if (kind === 'mermaid') {
-        await this.transport.exportFile('diagrama.mmd', exportToMermaid(this.schema), false);
+        await this.transport.exportFile('diagram.mmd', exportToMermaid(this.schema), false);
         return;
       }
       const svg = exportToSvg(this.schema, this.positions, this.scene, this.prefs.mode);
       if (kind === 'svg') {
-        await this.transport.exportFile('diagrama.svg', svg, false);
+        await this.transport.exportFile('diagram.svg', svg, false);
         return;
       }
       const blob = await exportSvgStringToRasterBlob(svg, kind === 'png' ? 'image/png' : 'image/jpeg');
@@ -931,9 +931,9 @@ export class Workbench {
         fr.onerror = rej;
         fr.readAsDataURL(blob);
       });
-      await this.transport.exportFile(kind === 'png' ? 'diagrama.png' : 'diagrama.jpg', b64, true);
+      await this.transport.exportFile(kind === 'png' ? 'diagram.png' : 'diagram.jpg', b64, true);
     } catch (e) {
-      this.toast('Falha ao exportar: ' + e);
+      this.toast('Export failed: ' + e);
     }
   }
 
@@ -967,21 +967,21 @@ export class Workbench {
     const p = this.prefs;
     const sc = (v: number) => Math.abs(p.uiScale - v) < 0.05;
     this.openMenu(anchor, `
-      <div class="lb">Tema</div>
-      <button class="mi" data-act="set-mode" data-mode="dark">${ck(p.mode === 'dark')}Escuro</button>
-      <button class="mi" data-act="set-mode" data-mode="light">${ck(p.mode === 'light')}Claro</button><hr>
-      <div class="lb">Tamanho da interface</div>
-      ${UI_STEPS.map((s, i) => `<button class="mi" data-act="set-ui" data-ui="${s}">${ck(sc(s))}${['Padrão (100%)', 'Médio (115%)', 'Grande (130%)'][i]}</button>`).join('')}<hr>
-      <div class="lb">Painéis</div>
-      <button class="mi" data-act="ToggleAutoCollapseInspector">${ck(p.autoHide)}Recolher inspector quando nada selecionado</button>
-      <button class="mi" data-act="ToggleCardTransparency">${ck(p.translucent)}Cartões translúcidos</button>`);
+      <div class="lb">Theme</div>
+      <button class="mi" data-act="set-mode" data-mode="dark">${ck(p.mode === 'dark')}Dark</button>
+      <button class="mi" data-act="set-mode" data-mode="light">${ck(p.mode === 'light')}Light</button><hr>
+      <div class="lb">UI Scale</div>
+      ${UI_STEPS.map((s, i) => `<button class="mi" data-act="set-ui" data-ui="${s}">${ck(sc(s))}${['Default (100%)', 'Medium (115%)', 'Large (130%)'][i]}</button>`).join('')}<hr>
+      <div class="lb">Panels</div>
+      <button class="mi" data-act="ToggleAutoCollapseInspector">${ck(p.autoHide)}Auto-collapse inspector when nothing selected</button>
+      <button class="mi" data-act="ToggleCardTransparency">${ck(p.translucent)}Translucent cards</button>`);
   }
 
   private exportMenu(anchor: HTMLElement): void {
     this.openMenu(anchor, `
       <button class="mi" data-act="ExportPng"><span class="ck"></span>PNG</button>
       <button class="mi" data-act="ExportJpeg"><span class="ck"></span>JPEG</button>
-      <button class="mi" data-act="ExportSvg"><span class="ck"></span>SVG vetorial</button>
+      <button class="mi" data-act="ExportSvg"><span class="ck"></span>Vector SVG</button>
       <button class="mi" data-act="ExportMermaid"><span class="ck"></span>Mermaid erDiagram</button>`);
   }
 
@@ -1008,7 +1008,7 @@ export class Workbench {
     this.paletteOpen = true;
     this.paletteQuery = '';
     this.paletteIdx = 0;
-    const bg = this.modal(`<input id="pal-q" placeholder="Digite um comando…" autocomplete="off"><div class="list" id="pal-list"></div>`);
+    const bg = this.modal(`<input id="pal-q" placeholder="Type a command…" autocomplete="off"><div class="list" id="pal-list"></div>`);
     const q = bg.querySelector('#pal-q') as HTMLInputElement;
     const draw = () => {
       const items = this.paletteItems();
@@ -1171,7 +1171,7 @@ export class Workbench {
     const orig = t.dataset.orig || '';
     if (val === orig) return;
     if (kind !== 'coltype' && !IDENT.test(val)) {
-      this.toast('Nome inválido: use apenas letras, números e _');
+      this.toast('Invalid name: use only letters, numbers, and _');
       t.value = orig;
       return;
     }
@@ -1188,11 +1188,11 @@ export class Workbench {
     const q = t.value.trim().toLowerCase();
     const opts: Array<[string, string]> = [];
     for (const [ty, d] of STANDARD_TYPES) if (!q || ty.toLowerCase().includes(q)) opts.push([ty, d]);
-    for (const en of this.enums) if (!q || en.toLowerCase().includes(q)) opts.push([en, 'enumeração']);
+    for (const en of this.enums) if (!q || en.toLowerCase().includes(q)) opts.push([en, 'enumeration']);
     if (!opts.length) return;
     const box = document.createElement('div');
     box.className = 'suggest';
-    box.innerHTML = `<div class="hh"><span>Sugestões de tipo (clique para aplicar)</span><span>Esc fecha</span></div>` +
+    box.innerHTML = `<div class="hh"><span>Type suggestions (click to apply)</span><span>Esc closes</span></div>` +
       opts.slice(0, 8).map(([ty, d]) => `<div class="op" data-ty="${esc(ty)}"><span>${esc(ty)}</span><small>${esc(d)}</small></div>`).join('');
     const r = t.getBoundingClientRect();
     box.style.left = Math.min(r.left, window.innerWidth - 250) + 'px';

@@ -1,49 +1,6 @@
-schema: spec-driven-ptbr
+schema: spec-driven
 
 context: |
-  Idioma: pt-BR.
-  Todos os artefatos (proposal, specs, design, tasks) devem ser escritos em pt-BR,
-  inclusive os títulos de seção dos templates. Ficam em inglês só as palavras-chave que
-  a CLI exige: `## Purpose`, `## Requirements`, `## ADDED/MODIFIED/REMOVED/RENAMED
-  Requirements`, `### Requirement:`, `#### Scenario:`, `SHALL`/`MUST`, `WHEN`/`THEN`.
-
-  Projeto: DB Modeling — app desktop (Rust + GPUI via gpui-kit) para modelagem visual de
-  bancos de dados, alvos Windows 10/11 e Ubuntu 22.04/24.04.
-  Escopo: modelagem visual + texto DBML; export PNG, JPEG e Mermaid erDiagram.
-  Fora de escopo: conexão/leitura de banco, SQL (export/import/migrações), macOS.
-  Antes de propor, ler CLAUDE.md e docs/ (visão, linguagem, arquitetura, stack, UX,
-  roadmap, riscos.md), GLOSSARY.md e openspec/adr/. Respeitar as ADRs aceitas; mudar uma ADR exige
-  dizer isso explicitamente no proposal.
-  Invariantes: DBML do usuário permanece válido (metadados no sidecar JSON); edições da
-  UI viram patches textuais mínimos; só o crate `app` depende de GPUI; toda ação de UI é
-  acessível por teclado, está na command palette, sem modal e com undo.
-
-rules:
-  proposal:
-    - Dizer explicitamente o que fica fora de escopo
-    - Citar as ADRs (openspec/adr/NNNN) e riscos (R1..R10) afetados
-    - Usar os termos de GLOSSARY.md
-  design:
-    - Indicar em qual crate do workspace cada parte vive
-  tasks:
-    - Cada tarefa que altera parser/edição inclui teste de snapshot ou de propriedade
-    - Tarefas de UI incluem o checklist de qualidade de docs/05-ux.md
-
-# Regras por artefato (opcional) — veja `rules:` acima.
-# Exemplo:
-#   rules:
-#     proposal:
-#       - Manter proposals com menos de 500 palavras
-#     tasks:
-#       - Quebrar tarefas em blocos de no máximo 2 horas
-
-# Orientação por operação (opcional)
-# Conselhos sobre como conduzir apply e archive, separados das regras de artefato.
-# Exemplo:
-#   operations:
-#     apply:
-#       guidance:
-#         - Manter os resumos de teste concisos
-#     archive:
-#       guidance:
-#         - Resumir o resultado do archive antes de terminar
+  Project: Desktop visual database modeling app (DBML) in Rust + GPUI.
+  Documentation and specifications in English (en-US). Code identifiers in English.
+  Canonical architecture and decisions in docs/ and openspec/adr/.

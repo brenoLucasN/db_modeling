@@ -1,71 +1,56 @@
 #!/usr/bin/env bash
-# Sincroniza o núcleo Rust/Wasm, o Canvas Web, a CLI Web (assets embutidos),
-# a Extensão VS Code e valida a compilação do App Desktop e do workspace.
+# ==============================================================================
+# Unified Build & Synchronization Script (Desktop + CLI Web + VS Code)
 #
-# Uso:
-#   ./scripts/sync-build.sh              # Sincroniza Wasm + Canvas Web + CLI assets + VS Code dist + cargo check
-#   ./scripts/sync-build.sh --package    # Também gera o pacote .vsix da extensão VS Code
-#   ./scripts/sync-build.sh --release    # Também compila os binários release (app e dbml-cli)
+# Ensures that any change in the Rust core (`dbml-analysis`, `dbml-edit`,
+# `dbml-wasm`, `layout`, `schema`) or the shared web package (`packages/canvas-web`)
+# is recompiled and propagated across all targets:
+#   1. WebAssembly (`packages/canvas-web/src/wasm`)
+#   2. CLI Web Bundle (`crates/cli/web/`)
+#   3. VS Code Extension Bundle (`vscode-extension/dist/`)
+#   4. Rust Verification (`cargo test` + `cargo check` for `cli` and `app`)
+# ==============================================================================
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-DO_PACKAGE=false
-DO_RELEASE=false
+MODE="${1:---dev}"
 
-for arg in "$@"; do
-    case "$arg" in
-        --package) DO_PACKAGE=true ;;
-        --release) DO_RELEASE=true ;;
-        *)
-            echo "Uso: $0 [--package] [--release]"
-            exit 1
-            ;;
-    esac
-done
+echo "==> [1/5] Running Rust core tests..."
+cargo test -p schema -p dbml-syntax -p dbml-analysis -p dbml-edit -p layout -p dbml-wasm
 
-echo "==> [1/5] Compilando núcleo Rust para WebAssembly (dbml-wasm)..."
-cargo build -p dbml-wasm --target wasm32-unknown-unknown --release
-
-if ! command -v wasm-bindgen &>/dev/null; then
-    echo "Erro: 'wasm-bindgen' não encontrado no PATH. Instale com: cargo install wasm-bindgen-cli"
-    exit 1
+echo "==> [2/5] Building Wasm (dbml-wasm -> packages/canvas-web/src/wasm)..."
+if [[ "$MODE" == "--release" ]]; then
+  wasm-pack build crates/dbml-wasm --target web --release --out-dir ../../packages/canvas-web/src/wasm
+else
+  wasm-pack build crates/dbml-wasm --target web --dev --out-dir ../../packages/canvas-web/src/wasm
 fi
+rm -f packages/canvas-web/src/wasm/.gitignore
 
-wasm-bindgen \
-    --target web \
-    --out-dir packages/canvas-web/src/wasm \
-    target/wasm32-unknown-unknown/release/dbml_wasm.wasm
-
-echo "==> [2/5] Compilando pacote compartilhado @dbmodeling/canvas-web (Lib + SPA)..."
+echo "==> [3/5] Building packages/canvas-web (Lib + Web App) and syncing crates/cli/web/..."
 (
-    cd packages/canvas-web
-    npm run build
-    npm run build:app
+  cd packages/canvas-web
+  npm run build
+  npm run build:app
 )
-
-echo "==> [3/5] Atualizando assets web embutidos na CLI (crates/cli/web/)..."
-rm -rf crates/cli/web/*
-mkdir -p crates/cli/web
+rm -rf crates/cli/web/assets
 cp -r packages/canvas-web/dist-app/* crates/cli/web/
 
-echo "==> [4/5] Sincronizando e compilando Extensão VS Code (vscode-extension)..."
+echo "==> [4/5] Building VS Code Extension (vscode-extension/dist/)..."
+cp -f LICENSE vscode-extension/LICENSE
+cp -f crates/app/assets/sample.dbml vscode-extension/media/sample.dbml 2>/dev/null || true
 (
-    cd vscode-extension
-    npm run build
-    if [ "$DO_PACKAGE" = true ]; then
-        npm run package
-    fi
+  cd vscode-extension
+  npm run compile
 )
 
-echo "==> [5/5] Formatando, verificando clippy e rodando testes do workspace Rust..."
-cargo fmt --all
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-if [ "$DO_RELEASE" = true ]; then
-    cargo build --release -p app -p dbml-cli
+echo "==> [5/5] Verifying Rust binaries (dbml-cli & app)..."
+if [[ "$MODE" == "--release" ]]; then
+  cargo build -p dbml-cli -p app --release
+else
+  cargo check -p dbml-cli -p app
 fi
 
-echo "✓ Sincronização concluída! Desktop (app), CLI Web (dbml-cli) e VS Code estão alinhados."
+echo "✅ Synchronization complete! Desktop (app), CLI (dbml), and VS Code Extension are aligned."

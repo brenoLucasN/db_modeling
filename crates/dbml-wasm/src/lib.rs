@@ -472,7 +472,7 @@ pub fn parse_and_analyze(source: &str) -> Result<JsValue, JsValue> {
 #[wasm_bindgen]
 pub fn apply_command(source: &str, command_js: JsValue) -> Result<JsValue, JsValue> {
     let command: Command = serde_wasm_bindgen::from_value(command_js)
-        .map_err(|e| JsValue::from_str(&format!("Comando inválido: {e}")))?;
+        .map_err(|e| JsValue::from_str(&format!("Invalid command: {e}")))?;
 
     let line_index = LineIndex::new(source);
     let mut created_table = None;
@@ -483,14 +483,14 @@ pub fn apply_command(source: &str, command_js: JsValue) -> Result<JsValue, JsVal
     let new_source = match command {
         Command::AddTable { name } => {
             let table_name =
-                name.unwrap_or_else(|| dbml_edit::unique_table_name(source, "nova_tabela"));
+                name.unwrap_or_else(|| dbml_edit::unique_table_name(source, "new_table"));
             created_table = Some(table_name.clone());
             dbml_edit::add_table(source, &table_name)
         }
         Command::DeleteTable { name } => dbml_edit::delete_table(source, &name),
-        Command::DeleteTables { names } => names
-            .iter()
-            .fold(source.to_string(), |acc, t| dbml_edit::delete_table(&acc, t)),
+        Command::DeleteTables { names } => names.iter().fold(source.to_string(), |acc, t| {
+            dbml_edit::delete_table(&acc, t)
+        }),
         Command::RenameTable { old_name, new_name } => {
             if old_name != new_name {
                 renamed_table = Some((old_name.clone(), new_name.clone()));
@@ -499,31 +499,28 @@ pub fn apply_command(source: &str, command_js: JsValue) -> Result<JsValue, JsVal
         }
         Command::AddColumn { table, name, ty } => {
             let col_name =
-                name.unwrap_or_else(|| dbml_edit::unique_column_name(source, &table, "coluna"));
+                name.unwrap_or_else(|| dbml_edit::unique_column_name(source, &table, "column"));
             let col_ty = ty.unwrap_or_else(|| "varchar(255)".to_string());
             created_column = Some((table.clone(), col_name.clone()));
             dbml_edit::add_column_text(source, &table, &col_name, &col_ty).ok_or_else(|| {
-                JsValue::from_str(&format!("Tabela '{table}' não encontrada para adicionar coluna"))
+                JsValue::from_str(&format!("Table '{table}' not found when adding column"))
             })?
         }
-        Command::DeleteColumn { table, column } => dbml_edit::delete_column(source, &table, &column)
-            .ok_or_else(|| {
-                JsValue::from_str(&format!("Coluna '{column}' não encontrada na tabela '{table}'"))
-            })?,
+        Command::DeleteColumn { table, column } => {
+            dbml_edit::delete_column(source, &table, &column).ok_or_else(|| {
+                JsValue::from_str(&format!("Column '{column}' not found in table '{table}'"))
+            })?
+        }
         Command::RenameColumn {
             table,
             old_name,
             new_name,
         } => dbml_edit::rename_column(source, &table, &old_name, &new_name).ok_or_else(|| {
-            JsValue::from_str(&format!(
-                "Coluna '{old_name}' não encontrada na tabela '{table}'"
-            ))
+            JsValue::from_str(&format!("Column '{old_name}' not found in table '{table}'"))
         })?,
         Command::SetColumnType { table, column, ty } => {
             dbml_edit::set_column_type(source, &table, &column, &ty).ok_or_else(|| {
-                JsValue::from_str(&format!(
-                    "Coluna '{column}' não encontrada na tabela '{table}'"
-                ))
+                JsValue::from_str(&format!("Column '{column}' not found in table '{table}'"))
             })?
         }
         Command::SetColumnFlag {
@@ -531,11 +528,13 @@ pub fn apply_command(source: &str, command_js: JsValue) -> Result<JsValue, JsVal
             column,
             flag,
             value,
-        } => dbml_edit::set_column_flag(source, &table, &column, &flag, value).ok_or_else(|| {
-            JsValue::from_str(&format!(
-                "Não foi possível alterar flag '{flag}' da coluna '{column}' na tabela '{table}'"
-            ))
-        })?,
+        } => {
+            dbml_edit::set_column_flag(source, &table, &column, &flag, value).ok_or_else(|| {
+                JsValue::from_str(&format!(
+                    "Could not toggle flag '{flag}' on column '{column}' in table '{table}'"
+                ))
+            })?
+        }
         Command::AddRef {
             from_table,
             from_col: _,
@@ -560,13 +559,13 @@ pub fn apply_command(source: &str, command_js: JsValue) -> Result<JsValue, JsVal
         }
         Command::UngroupTables { tables } => {
             should_relayout = true;
-            tables
-                .iter()
-                .fold(source.to_string(), |acc, t| dbml_edit::ungroup_table(&acc, t))
+            tables.iter().fold(source.to_string(), |acc, t| {
+                dbml_edit::ungroup_table(&acc, t)
+            })
         }
         Command::SetTableColor { table, color } => {
             dbml_edit::set_table_color(source, &table, color.as_deref()).ok_or_else(|| {
-                JsValue::from_str(&format!("Tabela '{table}' não encontrada para definir cor"))
+                JsValue::from_str(&format!("Table '{table}' not found when setting color"))
             })?
         }
     };

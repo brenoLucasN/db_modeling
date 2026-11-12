@@ -225,7 +225,7 @@ export function renderCanvasWorld(params: {
           <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${g.text};font-weight:${c.pk ? 500 : 400};">${escHtml(c.name)}</div>
           <div style="font-size:${11.5 * g.uiScale}px;color:${g.textMuted};">${escHtml(c.ty)}</div>
           ${c.not_null ? `<div style="font-size:${10 * g.uiScale}px;color:${g.textMuted};">NN</div>` : ''}
-          <div class="dbm-col-port" title="Arraste até outra coluna para criar relação" data-port-table="${escHtml(t.name)}" data-port-col="${escHtml(c.name)}"></div>
+          <div class="dbm-col-port" title="Drag to another column to create relation" data-port-table="${escHtml(t.name)}" data-port-col="${escHtml(c.name)}"></div>
         </div>
       `;
     });
@@ -246,7 +246,7 @@ export function renderCanvasWorld(params: {
           <div class="dbm-card-count">${t.columns.length}</div>
         </div>
         <div class="dbm-card-rows">${rowsHtml}</div>
-        <button class="dbm-card-addcol" title="Adicionar coluna" data-add-col-table="${escHtml(t.name)}">
+        <button class="dbm-card-addcol" title="Add column" data-add-col-table="${escHtml(t.name)}">
           ${iconSvg('Plus', 12, g.textMuted)}
         </button>
       </div>
@@ -284,38 +284,38 @@ export function renderCanvasOverlays(params: {
     <!-- Ilha Topo-Centro: Ferramentas -->
     <div style="position:absolute;top:12px;left:0;width:100%;display:flex;justify-content:center;pointer-events:none;z-index:12;">
       <div class="dbm-island" style="pointer-events:auto;position:relative;">
-        <button class="dbm-tool-btn ${tool === 'select' ? 'active' : ''}" title="Selecionar (V)" data-action="ToolSelect">
+        <button class="dbm-tool-btn ${tool === 'select' ? 'active' : ''}" title="Select (V)" data-action="ToolSelect">
           ${iconSvg('MousePointer2', 17)}
         </button>
-        <button class="dbm-tool-btn ${tool === 'hand' ? 'active' : ''}" title="Mão: mover a vista (H)" data-action="ToolHand">
+        <button class="dbm-tool-btn ${tool === 'hand' ? 'active' : ''}" title="Hand: pan view (H)" data-action="ToolHand">
           ${iconSvg('Hand', 17)}
         </button>
         <div class="dbm-island-sep"></div>
-        <button class="dbm-tool-btn" title="Nova tabela (T)" data-action="NewTable">
+        <button class="dbm-tool-btn" title="New Table (T)" data-action="NewTable">
           ${iconSvg('Plus', 17)}
         </button>
         <div class="dbm-island-sep"></div>
-        <button class="dbm-tool-btn" title="Reorganizar automaticamente (Ctrl+L)" data-action="Relayout">
+        <button class="dbm-tool-btn" title="Auto-Layout (Ctrl+L)" data-action="Relayout">
           ${iconSvg('LayoutGrid', 17)}
         </button>
-        <button class="dbm-tool-btn" title="Ajustar à tela (Shift+1)" data-action="FitView">
+        <button class="dbm-tool-btn" title="Fit to Screen (Shift+1)" data-action="FitView">
           ${iconSvg('Scan', 17)}
         </button>
         <div class="dbm-island-sep"></div>
-        <button class="dbm-tool-btn ${editorOpen ? 'active' : ''}" title="Editor DBML (Ctrl+E)" data-action="ToggleEditor">
+        <button class="dbm-tool-btn ${editorOpen ? 'active' : ''}" title="DBML Editor (Ctrl+E)" data-action="ToggleEditor">
           ${iconSvg('Braces', 17)}
         </button>
-        <button class="dbm-tool-btn ${exportMenuOpen ? 'active' : ''}" title="Exportar diagrama (SVG, PNG, JPEG, Mermaid)" data-toggle-export="true">
+        <button class="dbm-tool-btn ${exportMenuOpen ? 'active' : ''}" title="Export diagram (SVG, PNG, JPEG, Mermaid)" data-toggle-export="true">
           ${iconSvg('Download', 17)}
         </button>
         ${
           exportMenuOpen
             ? `
           <div style="position:absolute;top:44px;right:0;width:190px;padding:6px;border-radius:8px;border:1px solid ${g.edge};background:${g.sidebar};box-shadow:${g.islandShadow};display:flex;flex-direction:column;gap:2px;z-index:50;">
-            <div style="padding:4px 8px;font-size:10.5px;font-weight:600;color:${g.textFaint};">EXPORTAR DIAGRAMA</div>
-            <button class="dbm-row-btn" data-action="ExportSvg" style="margin:0;">SVG Vetorial (.svg)</button>
-            <button class="dbm-row-btn" data-action="ExportPng" style="margin:0;">Imagem PNG (.png)</button>
-            <button class="dbm-row-btn" data-action="ExportJpeg" style="margin:0;">Imagem JPEG (.jpg)</button>
+            <div style="padding:4px 8px;font-size:10.5px;font-weight:600;color:${g.textFaint};">EXPORT DIAGRAM</div>
+            <button class="dbm-row-btn" data-action="ExportSvg" style="margin:0;">Vector SVG (.svg)</button>
+            <button class="dbm-row-btn" data-action="ExportPng" style="margin:0;">PNG Image (.png)</button>
+            <button class="dbm-row-btn" data-action="ExportJpeg" style="margin:0;">JPEG Image (.jpg)</button>
             <button class="dbm-row-btn" data-action="ExportMermaid" style="margin:0;">Mermaid erDiagram (.mmd)</button>
           </div>
         `
@@ -327,13 +327,13 @@ export function renderCanvasOverlays(params: {
     <!-- Ilha Base-Esquerda: Zoom -->
     <div style="position:absolute;bottom:12px;left:12px;z-index:12;">
       <div class="dbm-island">
-        <button class="dbm-tool-btn" title="Reduzir (Ctrl+-)" data-action="ZoomOut">
+        <button class="dbm-tool-btn" title="Zoom Out (Ctrl+-)" data-action="ZoomOut">
           ${iconSvg('ZoomOut', 17)}
         </button>
-        <button title="Ajustar à tela (Shift+1)" data-action="FitView" style="height:28px;padding:0 8px;border-radius:6px;border:none;background:transparent;color:${g.text};font-size:12.5px;font-weight:500;cursor:pointer;">
+        <button title="Fit to Screen (Shift+1)" data-action="FitView" style="height:28px;padding:0 8px;border-radius:6px;border:none;background:transparent;color:${g.text};font-size:12.5px;font-weight:500;cursor:pointer;">
           ${pct}
         </button>
-        <button class="dbm-tool-btn" title="Ampliar (Ctrl+=)" data-action="ZoomIn">
+        <button class="dbm-tool-btn" title="Zoom In (Ctrl+=)" data-action="ZoomIn">
           ${iconSvg('ZoomIn', 17)}
         </button>
       </div>
@@ -342,7 +342,7 @@ export function renderCanvasOverlays(params: {
     <!-- Ilha Base-Direita: Ajuda / Legenda -->
     <div style="position:absolute;bottom:12px;right:12px;z-index:12;">
       <div class="dbm-island">
-        <button class="dbm-tool-btn ${legendOpen ? 'active' : ''}" title="Legenda (Ctrl+Shift+L)" data-action="ToggleLegend">
+        <button class="dbm-tool-btn ${legendOpen ? 'active' : ''}" title="Legend (Ctrl+Shift+L)" data-action="ToggleLegend">
           ${iconSvg('Info', 17)}
         </button>
       </div>
@@ -354,26 +354,26 @@ export function renderCanvasOverlays(params: {
       <div style="position:absolute;bottom:52px;right:12px;max-width:280px;z-index:12;">
         <div class="dbm-island" style="flex-direction:column;align-items:flex-start;gap:6px;padding:10px 12px;">
           <div style="width:100%;display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:12px;font-weight:600;color:${g.text};">Legenda</span>
-            <button class="dbm-rail-btn" style="width:20px;height:20px;" title="Ocultar legenda" data-action="ToggleLegend">
+            <span style="font-size:12px;font-weight:600;color:${g.text};">Legend</span>
+            <button class="dbm-rail-btn" style="width:20px;height:20px;" title="Hide legend" data-action="ToggleLegend">
               ${iconSvg('X', 13, g.textMuted)}
             </button>
           </div>
           <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:${g.textMuted};">
             <span style="width:22px;text-align:center;font-weight:600;color:${g.accent};">PK</span>
-            <span>Chave primária</span>
+            <span>Primary key</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:${g.textMuted};">
             <span style="width:22px;display:flex;justify-content:center;"><span style="width:20px;height:1.5px;background:${g.textMuted};display:block;"></span></span>
-            <span>Relação (coluna → coluna)</span>
+            <span>Relation (column → column)</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:${g.textMuted};">
             <span style="width:22px;text-align:center;font-size:11px;">N · 1</span>
-            <span>Cardinalidade: muitos · um</span>
+            <span>Cardinality: many · one</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:${g.textMuted};">
             <span style="width:22px;display:flex;justify-content:center;"><span style="width:20px;height:2px;background:${g.accent};display:block;"></span></span>
-            <span>Tabela selecionada e suas relações</span>
+            <span>Selected table and its relations</span>
           </div>
         </div>
       </div>
@@ -387,17 +387,17 @@ export function renderCanvasOverlays(params: {
           <div style="width:40px;height:40px;border-radius:10px;background:${g.hover};display:flex;align-items:center;justify-content:center;">
             ${iconSvg('Database', 20, g.accent)}
           </div>
-          <div style="font-size:15px;font-weight:600;color:${g.text};">Nenhuma tabela ainda</div>
-          <div style="font-size:13px;color:${g.textMuted};line-height:1.45;">Escreva o esquema em DBML no editor ou crie uma nova tabela no canvas.</div>
+          <div style="font-size:15px;font-weight:600;color:${g.text};">No tables yet</div>
+          <div style="font-size:13px;color:${g.textMuted};line-height:1.45;">Write your DBML schema in the editor or create a new table on the canvas.</div>
           <div style="display:flex;gap:8px;margin-top:6px;">
             <button data-action="ToggleEditor" style="height:30px;padding:0 10px;border-radius:6px;border:1px solid ${g.edge};background:${g.hover};color:${g.text};font-size:12.5px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
               ${iconSvg('Braces', 14, g.textMuted)}
-              <span>Abrir editor DBML</span>
+              <span>Open DBML Editor</span>
               ${renderKbd(['Ctrl', 'E'])}
             </button>
             <button data-action="NewTable" style="height:30px;padding:0 10px;border-radius:6px;border:1px solid ${g.edge};background:${g.hover};color:${g.text};font-size:12.5px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
               ${iconSvg('Plus', 14, g.textMuted)}
-              <span>Nova tabela</span>
+              <span>New Table</span>
               ${renderKbd(['T'])}
             </button>
           </div>

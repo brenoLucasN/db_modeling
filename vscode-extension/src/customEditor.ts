@@ -112,7 +112,7 @@ export class DbmlCustomEditorProvider implements vscode.CustomTextEditorProvider
               new TextEncoder().encode(JSON.stringify(message.layout, null, 2))
             );
           } catch (err) {
-            console.error('Erro ao salvar sidecar .layout.json:', err);
+            console.error('Failed to save .layout.json sidecar:', err);
           }
           break;
         }
@@ -138,12 +138,12 @@ export class DbmlCustomEditorProvider implements vscode.CustomTextEditorProvider
           const dir = document.uri.scheme === 'file' ? vscode.Uri.joinPath(document.uri, '..') : undefined;
           const saveUri = await vscode.window.showSaveDialog({
             defaultUri: dir ? vscode.Uri.joinPath(dir, filename) : undefined,
-            saveLabel: 'Salvar exportação',
+            saveLabel: 'Save export',
           });
           if (saveUri) {
             const data = isBinary ? Buffer.from(content, 'base64') : new TextEncoder().encode(content);
             await vscode.workspace.fs.writeFile(saveUri, data);
-            vscode.window.showInformationMessage(`Arquivo exportado: ${saveUri.fsPath}`);
+            vscode.window.showInformationMessage(`Exported file: ${saveUri.fsPath}`);
           }
           break;
         }
@@ -187,7 +187,7 @@ export class DbmlCustomEditorProvider implements vscode.CustomTextEditorProvider
     );
 
     return `<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

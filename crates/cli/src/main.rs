@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
     );
     println!(
         "{}",
-        "        DB Modeling - Servidor Web & Canvas Local         "
+        "         DB Modeling - Local Web Server & Canvas          "
             .blue()
             .bold()
     );
@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     );
     println!(
         "  {} {}",
-        "Arquivo: ".bold(),
+        "File:    ".bold(),
         state.file_path.display().to_string().cyan()
     );
     println!(
@@ -64,12 +64,12 @@ async fn main() -> anyhow::Result<()> {
     );
     println!(
         "  {} {}",
-        "Servidor:".bold(),
+        "Server:  ".bold(),
         url.green().bold().underline()
     );
     println!(
-        "\n  {} Pressione {} para encerrar o servidor.\n",
-        "Dica:".yellow(),
+        "\n  {} Press {} to stop the server.\n",
+        "Tip:".yellow(),
         "Ctrl+C".bold()
     );
 
@@ -90,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
             let _ = tokio::signal::ctrl_c().await;
             println!(
                 "\n{}",
-                "Encerrando o servidor DB Modeling com segurança...".yellow()
+                "Shutting down DB Modeling server gracefully...".yellow()
             );
         })
         .await?;

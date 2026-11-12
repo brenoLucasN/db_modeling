@@ -2,23 +2,24 @@
 name = "dbml-wasm"
 version.workspace = true
 edition.workspace = true
-publish = false
+license.workspace = true
+publish.workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
-serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = "0.6"
-serde_json = "1.0"
-schema = { path = "../schema" }
-dbml-syntax = { path = "../dbml-syntax" }
-dbml-analysis = { path = "../dbml-analysis" }
-dbml-edit = { path = "../dbml-edit" }
-layout = { path = "../layout" }
-rowan = { workspace = true }
+wasm-bindgen.workspace = true
+serde.workspace = true
+serde-wasm-bindgen.workspace = true
+serde_json.workspace = true
+schema.workspace = true
+dbml-syntax.workspace = true
+dbml-analysis.workspace = true
+dbml-edit.workspace = true
+layout.workspace = true
+rowan.workspace = true
 
 [dev-dependencies]
-proptest = { workspace = true }
-insta = { workspace = true }
+proptest.workspace = true
+insta.workspace = true

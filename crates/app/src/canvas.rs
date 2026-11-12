@@ -186,37 +186,28 @@ impl Diagram {
     pub fn hint(&self) -> String {
         match (&self.drag, self.tool) {
             (Some(Drag::Cards { .. }), _) => match self.multi.len() {
-                0 => format!("Movendo {}", self.selected.clone().unwrap_or_default()),
-                n => format!("Movendo {} tabelas", n + 1),
+                0 => format!("Moving {}", self.selected.clone().unwrap_or_default()),
+                n => format!("Moving {} tables", n + 1),
             },
-            (Some(Drag::Link { from, .. }), _) => format!(
-                "Relação a partir de {}.{}: solte sobre a coluna de destino",
-                from.0, from.1
-            ),
-            (Some(Drag::Marquee { .. }), _) => {
-                "Selecionando: solte para selecionar as tabelas tocadas".into()
+            (Some(Drag::Link { from, .. }), _) => {
+                format!("Relation from {}.{}: drop on target column", from.0, from.1)
             }
-            (Some(Drag::Pan { .. }), _) => "Movendo a vista".into(),
-            (Some(Drag::Group { name, .. }), _) => format!("Movendo o grupo {name}"),
-            (None, Tool::Hand) => {
-                "Mão: arraste para mover a vista · V volta para Selecionar".into()
-            }
+            (Some(Drag::Marquee { .. }), _) => "Selecting: release to select touched tables".into(),
+            (Some(Drag::Pan { .. }), _) => "Panning view".into(),
+            (Some(Drag::Group { name, .. }), _) => format!("Moving group {name}"),
+            (None, Tool::Hand) => "Hand: drag to pan view · V returns to Select".into(),
             (None, Tool::Select) if !self.multi.is_empty() => {
-                format!(
-                    "{} tabelas selecionadas · Ctrl+G agrupa",
-                    self.multi.len() + 1
-                )
+                format!("{} tables selected · Ctrl+G groups", self.multi.len() + 1)
             }
             (None, Tool::Select) if self.selected_ref.is_some() => {
-                "Relação selecionada · Delete exclui a linha e a coluna FK · Esc limpa a seleção"
+                "Relation selected · Delete removes line and FK column · Esc clears selection"
                     .into()
             }
             (None, Tool::Select) if self.selected.is_some() => {
-                "Arraste para mover a tabela · Esc limpa a seleção".into()
+                "Drag to move table · Esc clears selection".into()
             }
             (None, Tool::Select) => {
-                "Clique numa tabela para ver detalhes · arraste o fundo para mover · roda para zoom"
-                    .into()
+                "Click a table to inspect details · drag background to pan · scroll to zoom".into()
             }
         }
     }
@@ -684,7 +675,7 @@ impl Diagram {
         let mut root = div()
             .id("diagram")
             .role(Role::Group)
-            .aria_label("Diagrama")
+            .aria_label("Diagram")
             .key_context(actions::CANVAS)
             .track_focus(&self.focus)
             .relative()
@@ -922,7 +913,7 @@ impl Diagram {
                 div()
                     .id(SharedString::from(format!("group-{}", gr.name)))
                     .role(Role::Group)
-                    .aria_label(format!("Grupo {}", gr.name))
+                    .aria_label(format!("Group {}", gr.name))
                     .absolute()
                     .left(s(x0 - pad) + px(pan_x))
                     .top(s(y0 - pad - 8.) + px(pan_y))
@@ -1120,7 +1111,7 @@ impl Diagram {
                 div()
                     .id(SharedString::from(format!("table-{}", t.name)))
                     .role(Role::Group)
-                    .aria_label(format!("Tabela {}", t.name))
+                    .aria_label(format!("Table {}", t.name))
                     .absolute()
                     .left(s(x) + px(pan_x))
                     .top(s(y) + px(pan_y))
@@ -1258,7 +1249,7 @@ impl Diagram {
                         div()
                             .id(SharedString::from(format!("addcol-{}", t.name)))
                             .role(Role::Button)
-                            .aria_label("Adicionar coluna")
+                            .aria_label("Add column")
                             .absolute()
                             .bottom(s(-11.))
                             .left(s(CARD_W / 2. - 11.))
@@ -1376,19 +1367,19 @@ impl Diagram {
                 .flex()
                 .justify_center()
                 .child(
-                    island("canvas-tools", "Ferramentas")
+                    island("canvas-tools", "Tools")
                         .occlude()
                         .child(tool(
                             "tool-select",
                             IconName::MousePointer2,
-                            "Selecionar",
+                            "Select",
                             Box::new(ToolSelect),
                             self.tool == Tool::Select,
                         ))
                         .child(tool(
                             "tool-hand",
                             IconName::Hand,
-                            "Mão: mover a vista",
+                            "Hand: pan view",
                             Box::new(ToolHand),
                             self.tool == Tool::Hand,
                         ))
@@ -1396,7 +1387,7 @@ impl Diagram {
                         .child(tool(
                             "tool-table",
                             IconName::Plus,
-                            "Nova tabela",
+                            "New Table",
                             Box::new(NewTable),
                             false,
                         ))
@@ -1404,14 +1395,14 @@ impl Diagram {
                         .child(tool(
                             "tool-layout",
                             IconName::LayoutGrid,
-                            "Reorganizar automaticamente",
+                            "Auto-Layout",
                             Box::new(Relayout),
                             false,
                         ))
                         .child(tool(
                             "tool-fit",
                             IconName::Scan,
-                            "Ajustar à tela",
+                            "Fit to Screen",
                             Box::new(FitView),
                             false,
                         ))
@@ -1419,7 +1410,7 @@ impl Diagram {
                         .child(tool(
                             "tool-editor",
                             IconName::Braces,
-                            "Editor DBML",
+                            "DBML Editor",
                             Box::new(ToggleEditor),
                             false,
                         )),
@@ -1440,7 +1431,7 @@ impl Diagram {
                         .child(tool(
                             "zoom-out",
                             IconName::ZoomOut,
-                            "Reduzir",
+                            "Zoom Out",
                             Box::new(ZoomOut),
                             false,
                         ))
@@ -1450,7 +1441,7 @@ impl Diagram {
                                 .small()
                                 .label(pct)
                                 .tooltip_with_action(
-                                    "Ajustar à tela",
+                                    "Fit to Screen",
                                     &FitView,
                                     Some(actions::CANVAS),
                                 )
@@ -1461,7 +1452,7 @@ impl Diagram {
                         .child(tool(
                             "zoom-in",
                             IconName::ZoomIn,
-                            "Ampliar",
+                            "Zoom In",
                             Box::new(ZoomIn),
                             false,
                         )),
@@ -1475,10 +1466,10 @@ impl Diagram {
                 .absolute()
                 .bottom(px(12.))
                 .right(px(12.))
-                .child(island("canvas-help", "Legenda").occlude().child(tool(
+                .child(island("canvas-help", "Legend").occlude().child(tool(
                     "help-legend",
                     IconName::Info,
-                    "Legenda",
+                    "Legend",
                     Box::new(ToggleLegend),
                     self.legend_open,
                 )))
@@ -1497,7 +1488,7 @@ impl Diagram {
                 .child(text)
         };
         let legend = {
-            island("canvas-legend", "Legenda")
+            island("canvas-legend", "Legend")
                 .flex_col()
                 .items_start()
                 .gap(px(6.))
@@ -1513,7 +1504,7 @@ impl Diagram {
                                 .text_size(TEXT_XS)
                                 .font_weight(FontWeight::MEDIUM)
                                 .text_color(g.text)
-                                .child("Legenda"),
+                                .child("Legend"),
                         )
                         .child(
                             Button::new("legend-close")
@@ -1521,7 +1512,7 @@ impl Diagram {
                                 .xsmall()
                                 .icon(IconName::X)
                                 .tooltip_with_action(
-                                    "Ocultar legenda",
+                                    "Hide legend",
                                     &ToggleLegend,
                                     Some(actions::CTX),
                                 )
@@ -1532,7 +1523,7 @@ impl Diagram {
                 )
                 .child(row(
                     div().text_size(TEXT_XS).child("PK").into_any_element(),
-                    "Chave primária",
+                    "Primary key",
                 ))
                 .child(row(
                     div()
@@ -1540,7 +1531,7 @@ impl Diagram {
                         .text_color(g.accent)
                         .child("FK")
                         .into_any_element(),
-                    "Chave estrangeira (id_tabela)",
+                    "Foreign key (id_table)",
                 ))
                 .child(row(
                     div()
@@ -1548,15 +1539,15 @@ impl Diagram {
                         .h(px(1.5))
                         .bg(g.text_muted)
                         .into_any_element(),
-                    "Relação (coluna → coluna)",
+                    "Relation (column → column)",
                 ))
                 .child(row(
                     div().text_size(TEXT_XS).child("N · 1").into_any_element(),
-                    "Cardinalidade: muitos · um",
+                    "Cardinality: many · one",
                 ))
                 .child(row(
                     div().w(px(20.)).h(px(2.)).bg(g.accent).into_any_element(),
-                    "Tabela selecionada e suas relações",
+                    "Selected table and its relations",
                 ))
         };
         if self.legend_open {
@@ -1582,19 +1573,19 @@ impl Diagram {
                     .child(crate::widgets::empty_state(
                         g,
                         IconName::Database,
-                        "Nenhuma tabela ainda",
-                        "Escreva o esquema em DBML no editor ou abra um arquivo existente.",
+                        "No tables yet",
+                        "Write your DBML schema in the editor or open an existing file.",
                         crate::widgets::EmptyAction {
                             id: "empty-editor",
                             icon: IconName::Braces,
-                            label: "Abrir editor DBML",
+                            label: "Open DBML Editor",
                             keys: "Ctrl+E",
                             action: Box::new(ToggleEditor),
                         },
                         crate::widgets::EmptyAction {
                             id: "empty-open",
                             icon: IconName::FolderOpen,
-                            label: "Abrir arquivo",
+                            label: "Open File",
                             keys: "Ctrl+O",
                             action: Box::new(OpenFile),
                         },

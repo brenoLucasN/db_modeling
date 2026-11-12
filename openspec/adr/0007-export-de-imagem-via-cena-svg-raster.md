@@ -1,11 +1,11 @@
 ---
-status: proposta
+status: accepted
 ---
 
-# Export de imagem via cena → SVG → raster
+# Image export via scene → SVG → raster
 
-O export PNG/JPEG não captura a janela GPUI: geramos SVG a partir da mesma geometria do canvas (crate `scene`) e rasterizamos com `resvg`. Motivo: independe de janela/GPU, permite resolução arbitrária e é testável headless. Título, legenda e marca d'água opcionais são elementos da cena.
+PNG/SVG export does not capture the raw window framebuffer: we generate SVG and high-DPI raster output directly from the shared scene geometry (`layout::SceneGraph`). Reason: window/GPU independent, supports arbitrary resolution (2x+), and is testable headlessly. Optional title and color legend are rendered as scene elements.
 
-## Consequências
+## Consequences
 
-Manter paridade visual canvas × export (risco R8 em `docs/riscos.md`).
+Maintain visual parity between interactive canvas and exported images.

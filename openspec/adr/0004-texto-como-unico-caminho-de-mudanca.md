@@ -1,11 +1,11 @@
 ---
-status: proposta
+status: accepted
 ---
 
-# Texto como único caminho de mudança
+# Text as the single path of change
 
-Edições feitas no canvas viram comandos semânticos que geram patches textuais mínimos no DBML; o `Schema` é sempre derivado do texto. Assim undo/redo, autosave, file watching e diagnósticos têm um único caminho. A alternativa (modelo como fonte e texto regenerado) perderia comentários e formatação do usuário.
+Edits made on the canvas become semantic commands that generate minimal textual patches in DBML; the `Schema` is always derived from the text. This gives undo/redo, autosave, file watching, and diagnostics a single unified pipeline. The alternative (in-memory model as source and regenerated text) would lose user comments and formatting.
 
-## Consequências
+## Consequences
 
-`dbml-edit` é complexo e precisa de testes de propriedade fortes (round-trip texto ↔ UI).
+`dbml-edit` is complex and requires strong property tests (text ↔ UI round-trip).

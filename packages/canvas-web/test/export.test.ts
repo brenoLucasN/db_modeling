@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { exportToMermaid, exportToSvg } from '../src/export';
 import { Schema } from '../src/types';
 
-describe('Exportação de Diagramas', () => {
+describe('Diagram Export', () => {
   const schema: Schema = {
     tables: [
       {
@@ -35,7 +35,7 @@ describe('Exportação de Diagramas', () => {
     posts: { x: 350, y: 50 },
   };
 
-  it('deve exportar para Mermaid erDiagram com sintaxe e cardinalidade válidas', () => {
+  it('should export to Mermaid erDiagram with valid syntax and cardinality', () => {
     const mermaid = exportToMermaid(schema);
 
     expect(mermaid).toContain('erDiagram');
@@ -46,7 +46,7 @@ describe('Exportação de Diagramas', () => {
     expect(mermaid).toContain('posts }o--|| users : "user_id to id"');
   });
 
-  it('deve exportar para SVG contendo nós e arestas vetoriais', () => {
+  it('should export to SVG containing vector nodes and edges', () => {
     const svg = exportToSvg(schema, positions);
 
     expect(svg).toContain('<svg');

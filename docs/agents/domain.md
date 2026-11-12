@@ -1,23 +1,23 @@
-# Documentação de domínio
+# Domain Documentation
 
-Como as skills de engenharia devem consumir a documentação de domínio deste repositório.
-Todo glossário e ADR é escrito em **português (pt-BR)**; identificadores de código ficam em inglês.
+How engineering skills should consume domain documentation in this repository.
+All glossaries, specs, and ADRs are written in **English (en-US)**; code identifiers are also in English.
 
-## Antes de explorar, ler
+## Before exploring, read
 
-- **`GLOSSARY.md`** na raiz do repositório.
-- **`openspec/adr/`**: ler as ADRs que tocam a área em que vai trabalhar.
+- **`GLOSSARY.md`** at the repository root.
+- **`openspec/adr/`**: read the ADRs covering the area you are working on.
 
-> **Neste repositório as ADRs ficam em `openspec/adr/`, junto com as specs.** Quando uma skill
-> (ex.: `domain-modeling`, `improve-codebase-architecture`) citar `docs/adr/`, use
-> `openspec/adr/`. Nunca crie `docs/adr/`.
+> **In this repository, ADRs live in `openspec/adr/` alongside specs.** When a skill
+> (e.g., `domain-modeling`, `improve-codebase-architecture`) refers to `docs/adr/`, use
+> `openspec/adr/`. Never create `docs/adr/`.
 
-Se algum desses arquivos não existir, **seguir em silêncio**: não apontar a ausência nem sugerir
-criá-los de antemão. A skill `/domain-modeling` (via `/grill-with-docs` e
-`/improve-codebase-architecture`) cria esses arquivos sob demanda, quando termos ou decisões
-forem de fato resolvidos.
+If any of these files do not exist, **proceed silently**: do not point out their absence or suggest
+creating them upfront. The `/domain-modeling` skill (via `/grill-with-docs` and
+`/improve-codebase-architecture`) creates these files on demand when terms or decisions
+are actually resolved.
 
-## Estrutura (contexto único)
+## Structure (single context)
 
 ```
 /
@@ -28,23 +28,21 @@ forem de fato resolvidos.
 └── crates/
 ```
 
-ADRs: numeração sequencial `NNNN-slug.md`, frontmatter `status:` com `proposta`, `aceita`,
-`obsoleta` ou `substituída pela ADR-NNNN`; seções opcionais `## Opções consideradas` e
-`## Consequências`.
+ADRs: sequential numbering `NNNN-slug.md`, frontmatter `status:` with `proposed`, `accepted`,
+`deprecated`, or `superseded by ADR-NNNN`; optional sections `## Considered Options` and
+`## Consequences`.
 
-## Usar o vocabulário do glossário
+## Use glossary vocabulary
 
-Quando a saída nomear um conceito do domínio (título de issue, proposta de refatoração,
-hipótese, nome de teste), usar o termo como definido no `GLOSSARY.md`. Não derivar para
-sinônimos que o glossário manda evitar.
+When output names a domain concept (issue title, refactoring proposal, hypothesis, test name),
+use the term as defined in `GLOSSARY.md`. Do not drift toward synonyms that the glossary advises avoiding.
 
-Se o conceito necessário ainda não está no glossário, é um sinal: ou está inventando
-linguagem que o projeto não usa (reconsiderar), ou há uma lacuna real (anotar para o
+If a required concept is not yet in the glossary, it is a signal: either you are inventing
+terminology the project does not use (reconsider), or there is a genuine gap (note it for
 `/domain-modeling`).
 
-## Apontar conflitos com ADRs
+## Flag conflicts with ADRs
 
-Se a saída contradiz uma ADR existente, dizer isso explicitamente em vez de sobrescrever em
-silêncio:
+If output contradicts an existing ADR, state this explicitly instead of silently overriding it:
 
-> _Contradiz a ADR-0004 (texto como único caminho de mudança), mas vale reabrir porque…_
+> _Contradicts ADR-0004 (text as the single path of change), but worth reopening because…_
