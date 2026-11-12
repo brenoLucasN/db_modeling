@@ -55,24 +55,24 @@ enum Pane {
 }
 
 const STANDARD_TYPES: &[(&str, &str)] = &[
-    ("int", "inteiro 4B"),
-    ("bigint", "inteiro longo 8B"),
-    ("smallint", "inteiro curto 2B"),
-    ("serial", "autoincremento"),
-    ("varchar(255)", "texto variável"),
-    ("text", "texto longo"),
-    ("boolean", "booleano"),
-    ("uuid", "identificador único"),
-    ("timestamp", "data e hora"),
-    ("timestamptz", "data e hora com fuso"),
-    ("date", "data"),
-    ("time", "hora"),
-    ("decimal(10,2)", "numérico decimal"),
-    ("float", "ponto flutuante"),
-    ("double", "ponto flutuante duplo"),
+    ("int", "4-byte integer"),
+    ("bigint", "8-byte integer"),
+    ("smallint", "2-byte integer"),
+    ("serial", "auto-increment"),
+    ("varchar(255)", "variable-length text"),
+    ("text", "long text"),
+    ("boolean", "boolean"),
+    ("uuid", "unique identifier"),
+    ("timestamp", "date and time"),
+    ("timestamptz", "date/time with timezone"),
+    ("date", "date"),
+    ("time", "time"),
+    ("decimal(10,2)", "exact decimal"),
+    ("float", "floating point"),
+    ("double", "double precision"),
     ("json", "JSON"),
-    ("jsonb", "JSON binário"),
-    ("bytea", "binário"),
+    ("jsonb", "binary JSON"),
+    ("bytea", "binary"),
 ];
 
 fn extract_enums_from_dbml(text: &str) -> Vec<String> {
@@ -255,7 +255,7 @@ impl Shell {
             Some(p) => this.open_path(p, window, cx),
             None => {
                 let text = include_str!("../assets/sample.dbml").to_string();
-                this.add_doc(text, None, "exemplo.dbml".into(), window, cx);
+                this.add_doc(text, None, "example.dbml".into(), window, cx);
             }
         }
         // DBM_SELECT: tabela pré-selecionada (harness de screenshot)
@@ -376,7 +376,7 @@ impl Shell {
                 let title = file_title(&path);
                 self.add_doc(text, Some(path), title, window, cx);
             }
-            Err(e) => window.push_notification(format!("Não foi possível abrir: {e}"), cx),
+            Err(e) => window.push_notification(format!("Could not open file: {e}"), cx),
         }
     }
 
@@ -405,7 +405,7 @@ impl Shell {
 
     fn new_file(&mut self, _: &NewFile, window: &mut Window, cx: &mut Context<Self>) {
         self.untitled += 1;
-        let title = format!("sem-titulo-{}.dbml", self.untitled);
+        let title = format!("untitled-{}.dbml", self.untitled);
         self.add_doc(String::new(), None, title, window, cx);
         self.editor_open = true;
         self.sidebar_open = false;
@@ -417,7 +417,7 @@ impl Shell {
             files: true,
             directories: false,
             multiple: true,
-            prompt: Some("Abrir".into()),
+            prompt: Some("Open".into()),
         });
         cx.spawn_in(window, async move |this, cx| {
             let Ok(Ok(Some(paths))) = rx.await else {
@@ -438,7 +438,7 @@ impl Shell {
             files: false,
             directories: true,
             multiple: false,
-            prompt: Some("Abrir projeto".into()),
+            prompt: Some("Open Project".into()),
         });
         cx.spawn_in(window, async move |this, cx| {
             let Ok(Ok(Some(paths))) = rx.await else {
@@ -479,7 +479,7 @@ impl Shell {
         let text = doc.editor.read(cx).value().to_string();
         match std::fs::write(&path, text) {
             Ok(()) => {
-                window.push_notification(format!("Salvo em {}", path.display()), cx);
+                window.push_notification(format!("Saved to {}", path.display()), cx);
                 doc.title = file_title(&path);
                 doc.path = Some(path);
                 doc.dirty = false;
@@ -487,7 +487,7 @@ impl Shell {
                     self.files = scan(&dir);
                 }
             }
-            Err(e) => window.push_notification(format!("Não foi possível salvar: {e}"), cx),
+            Err(e) => window.push_notification(format!("Could not save file: {e}"), cx),
         }
         cx.notify();
     }
@@ -652,7 +652,7 @@ impl Shell {
                         }
                     }
                     let mut cmd = Command::new(&state)
-                        .placeholder("Buscar comandos…")
+                        .placeholder("Search commands…")
                         .on_confirm(|_, window, cx| window.close_dialog(cx));
                     for (g, items) in groups {
                         cmd = cmd.group(CommandGroup::new().label(g).items(items));
@@ -666,7 +666,7 @@ impl Shell {
         window.open_dialog(cx, |dialog, _, _| {
             dialog
                 .w(px(520.))
-                .title("Atalhos de teclado")
+                .title("Keyboard Shortcuts")
                 .content(|content, window, _| {
                     let mut list = div().flex().flex_col().gap(px(6.));
                     for e in actions::catalog() {
@@ -776,7 +776,7 @@ impl Shell {
             EditTarget::Table(old) if value != old => {
                 if !ident {
                     window
-                        .push_notification("Nome de tabela inválido: use letras, números e _.", cx);
+                        .push_notification("Invalid table name: use letters, numbers, and _.", cx);
                 } else {
                     let new = value.clone();
                     self.edit_text(false, window, cx, |t| {
@@ -788,7 +788,7 @@ impl Shell {
             EditTarget::ColName(table, old) if value != old => {
                 if !ident {
                     window
-                        .push_notification("Nome de coluna inválido: use letras, números e _.", cx);
+                        .push_notification("Invalid column name: use letters, numbers, and _.", cx);
                 } else {
                     self.edit_text(false, window, cx, |t| {
                         dbml_edit::rename_column(t, &table, &old, &value)
@@ -808,7 +808,7 @@ impl Shell {
     fn add_column_to(&mut self, table: String, window: &mut Window, cx: &mut Context<Self>) {
         let Some(doc) = self.doc() else { return };
         let text = doc.editor.read(cx).value().to_string();
-        let name = dbml_edit::unique_column_name(&text, &table, "coluna");
+        let name = dbml_edit::unique_column_name(&text, &table, "column");
         self.edit_text(false, window, cx, |t| {
             dbml_edit::add_column_text(t, &table, &name, "int")
         });
@@ -819,7 +819,7 @@ impl Shell {
     fn new_table(&mut self, _: &NewTable, window: &mut Window, cx: &mut Context<Self>) {
         let Some(doc) = self.doc() else { return };
         let text = doc.editor.read(cx).value().to_string();
-        let name = dbml_edit::unique_table_name(&text, "tabela");
+        let name = dbml_edit::unique_table_name(&text, "table");
         self.edit_text(false, window, cx, |t| Some(dbml_edit::add_table(t, &name)));
         self.with_diagram(cx, |d| d.place_new(&name));
         self.inspector_open = true;
@@ -899,7 +899,7 @@ impl Shell {
         let Some(doc) = self.doc() else { return };
         let names = doc.diagram.read(cx).selection();
         if names.is_empty() {
-            window.push_notification("Selecione tabelas (Shift+clique) para agrupar.", cx);
+            window.push_notification("Select tables (Shift+click) to group.", cx);
             return;
         }
         self.edit_text(true, window, cx, |t| {
@@ -966,10 +966,7 @@ impl Shell {
         self.ui_scale = (scale * 100.0).round() / 100.0;
         self.apply_appearance(cx);
         window.push_notification(
-            format!(
-                "Escala da interface: {}%",
-                (self.ui_scale * 100.0).round() as i32
-            ),
+            format!("UI Scale: {}%", (self.ui_scale * 100.0).round() as i32),
             cx,
         );
     }
@@ -997,9 +994,9 @@ impl Shell {
         self.inspector_auto_hide = !self.inspector_auto_hide;
         self.save_prefs();
         let msg = if self.inspector_auto_hide {
-            "Inspector: ocultar quando nada selecionado (ativado)"
+            "Inspector: auto-collapse when nothing selected (enabled)"
         } else {
-            "Inspector: sempre visível (desativado)"
+            "Inspector: always visible (disabled)"
         };
         window.push_notification(msg, cx);
         cx.notify();
@@ -1135,7 +1132,7 @@ impl Shell {
                         div()
                             .id(("tab-close", i))
                             .role(Role::Button)
-                            .aria_label("Fechar aba")
+                            .aria_label("Close tab")
                             .size(px(18.))
                             .rounded(px(4.))
                             .flex()
@@ -1173,7 +1170,7 @@ impl Shell {
                     .ghost()
                     .xsmall()
                     .icon(IconName::Plus)
-                    .tooltip_with_action("Novo arquivo", &NewFile, Some(actions::CTX))
+                    .tooltip_with_action("New File", &NewFile, Some(actions::CTX))
                     .on_click(|_, window, cx| window.dispatch_action(Box::new(NewFile), cx)),
             ),
         );
@@ -1258,7 +1255,7 @@ impl Shell {
                 div()
                     .id("palette-pill")
                     .role(Role::Button)
-                    .aria_label("Buscar comandos (Ctrl+K)")
+                    .aria_label("Search commands (Ctrl+K)")
                     .flex_none()
                     .flex()
                     .items_center()
@@ -1280,7 +1277,7 @@ impl Shell {
                     .on_click(|_, window, cx| window.dispatch_action(Box::new(OpenPalette), cx))
                     .child(Icon::new(IconName::Search).xsmall())
                     .when(!compact, |d| {
-                        d.child(div().flex_1().child("Buscar comandos…"))
+                        d.child(div().flex_1().child("Search commands…"))
                             .child("Ctrl K")
                     }),
             )
@@ -1290,7 +1287,7 @@ impl Shell {
                         .ghost()
                         .small()
                         .icon(theme_icon)
-                        .tooltip_with_action("Alternar tema", &ToggleTheme, Some(actions::CTX))
+                        .tooltip_with_action("Toggle Theme", &ToggleTheme, Some(actions::CTX))
                         .on_click(|_, window, cx| {
                             window.dispatch_action(Box::new(ToggleTheme), cx)
                         }),
@@ -1326,9 +1323,9 @@ impl Shell {
                     .child(glyph)
             };
             let (max_label, max_glyph) = if maximized {
-                ("Restaurar", "\u{e923}")
+                ("Restore", "\u{e923}")
             } else {
-                ("Maximizar", "\u{e922}")
+                ("Maximize", "\u{e922}")
             };
             bar = bar.child(
                 div()
@@ -1337,7 +1334,7 @@ impl Shell {
                     .flex()
                     .child(caption(
                         "cap-min",
-                        "Minimizar",
+                        "Minimize",
                         WindowControlArea::Min,
                         "\u{e921}",
                         false,
@@ -1351,7 +1348,7 @@ impl Shell {
                     ))
                     .child(caption(
                         "cap-close",
-                        "Fechar",
+                        "Close",
                         WindowControlArea::Close,
                         "\u{e8bb}",
                         true,
@@ -1361,9 +1358,9 @@ impl Shell {
         #[cfg(not(windows))]
         {
             let (max_label, max_icon) = if maximized {
-                ("Restaurar", IconName::WindowRestore)
+                ("Restore", IconName::WindowRestore)
             } else {
-                ("Maximizar", IconName::WindowMaximize)
+                ("Maximize", IconName::WindowMaximize)
             };
 
             bar = bar.child(
@@ -1376,7 +1373,7 @@ impl Shell {
                         div()
                             .id("cap-min")
                             .role(Role::Button)
-                            .aria_label("Minimizar")
+                            .aria_label("Minimize")
                             .occlude()
                             .w(px(38.))
                             .h_full()
@@ -1438,7 +1435,7 @@ impl Shell {
                         div()
                             .id("cap-close")
                             .role(Role::Button)
-                            .aria_label("Fechar")
+                            .aria_label("Close")
                             .occlude()
                             .w(px(38.))
                             .h_full()
@@ -1539,7 +1536,7 @@ impl Shell {
             .child(item(
                 "rail-files",
                 IconName::Folder,
-                "Arquivos do projeto",
+                "Project Files",
                 Box::new(ShowFiles),
                 self.sidebar_open && !self.editor_open && self.pane == Pane::Files,
                 0,
@@ -1547,7 +1544,7 @@ impl Shell {
             .child(item(
                 "rail-schema",
                 IconName::Table2,
-                "Esquema",
+                "Schema",
                 Box::new(ShowSchema),
                 self.sidebar_open && !self.editor_open && self.pane == Pane::Schema,
                 0,
@@ -1555,7 +1552,7 @@ impl Shell {
             .child(item(
                 "rail-problems",
                 IconName::TriangleAlert,
-                "Problemas",
+                "Problems",
                 Box::new(ShowProblems),
                 self.sidebar_open && !self.editor_open && self.pane == Pane::Problems,
                 errors,
@@ -1563,7 +1560,7 @@ impl Shell {
             .child(item(
                 "rail-editor",
                 IconName::Braces,
-                "Editor DBML",
+                "DBML Editor",
                 Box::new(ToggleEditor),
                 self.editor_open,
                 0,
@@ -1579,37 +1576,37 @@ impl Shell {
                 Button::new("rail-appearance")
                     .ghost()
                     .icon(IconName::Palette)
-                    .tooltip("Aparência, tamanho da interface e painéis")
+                    .tooltip("Appearance, UI scale & panels")
                     .dropdown_menu(move |menu, _, _| {
-                        menu.label("Tema")
-                            .menu_with_check("Escuro", mode == Mode::Dark, Box::new(ToggleTheme))
-                            .menu_with_check("Claro", mode == Mode::Light, Box::new(ToggleTheme))
+                        menu.label("Theme")
+                            .menu_with_check("Dark", mode == Mode::Dark, Box::new(ToggleTheme))
+                            .menu_with_check("Light", mode == Mode::Light, Box::new(ToggleTheme))
                             .separator()
-                            .label("Tamanho da interface (Ctrl+Shift+= / -)")
+                            .label("UI Scale (Ctrl+Shift+= / -)")
                             .menu_with_check(
-                                "Padrão (100%)",
+                                "Default (100%)",
                                 (ui_scale - 1.0).abs() < 0.05,
                                 Box::new(ResetUiZoom),
                             )
                             .menu_with_check(
-                                "Médio (115%)",
+                                "Medium (115%)",
                                 (ui_scale - 1.15).abs() < 0.05,
                                 Box::new(ZoomInUi),
                             )
                             .menu_with_check(
-                                "Grande (130%)",
+                                "Large (130%)",
                                 (ui_scale - 1.30).abs() < 0.05,
                                 Box::new(ZoomInUi),
                             )
                             .separator()
-                            .label("Painéis")
+                            .label("Panels")
                             .menu_with_check(
-                                "Recolher inspector quando nada selecionado",
+                                "Auto-collapse inspector when nothing selected",
                                 auto_hide,
                                 Box::new(ToggleAutoCollapseInspector),
                             )
                             .menu_with_check(
-                                "Cartões translúcidos",
+                                "Translucent cards",
                                 translucent,
                                 Box::new(ToggleCardTransparency),
                             )
@@ -1618,7 +1615,7 @@ impl Shell {
             .child(item(
                 "rail-keys",
                 IconName::Keyboard,
-                "Atalhos de teclado",
+                "Keyboard Shortcuts",
                 Box::new(ShowShortcuts),
                 false,
                 0,
@@ -1626,7 +1623,7 @@ impl Shell {
             .child(item(
                 "rail-palette",
                 IconName::Command,
-                "Paleta de comandos",
+                "Command Palette",
                 Box::new(OpenPalette),
                 false,
                 0,
@@ -1716,7 +1713,7 @@ impl Shell {
             .child(item(
                 "rail-inspector",
                 IconName::SlidersHorizontal,
-                "Inspector / Detalhes (Ctrl+I)",
+                "Inspector / Details (Ctrl+I)",
                 Box::new(ToggleInspector),
                 self.inspector_open,
                 if has_selection { 1 } else { 0 },
@@ -1724,7 +1721,7 @@ impl Shell {
             .child(item(
                 "rail-legend",
                 IconName::Info,
-                "Legenda do diagrama (Ctrl+Shift+L)",
+                "Diagram Legend (Ctrl+Shift+L)",
                 Box::new(ToggleLegend),
                 legend_open,
                 0,
@@ -1777,7 +1774,7 @@ impl Shell {
 
         let (folder_title, count) = match &self.project {
             Some(p) => (file_title(p), self.files.len()),
-            None => ("Arquivos Abertos".to_string(), self.docs.len()),
+            None => ("Open Files".to_string(), self.docs.len()),
         };
 
         let header = div()
@@ -1833,7 +1830,7 @@ impl Shell {
                             .ghost()
                             .xsmall()
                             .icon(IconName::Plus)
-                            .tooltip_with_action("Novo arquivo", &NewFile, Some(actions::CTX))
+                            .tooltip_with_action("New File", &NewFile, Some(actions::CTX))
                             .on_click(|_, window, cx| {
                                 window.dispatch_action(Box::new(NewFile), cx)
                             }),
@@ -1843,7 +1840,7 @@ impl Shell {
                             .ghost()
                             .xsmall()
                             .icon(IconName::FolderOpen)
-                            .tooltip_with_action("Abrir pasta", &OpenFolder, Some(actions::CTX))
+                            .tooltip_with_action("Open Folder", &OpenFolder, Some(actions::CTX))
                             .on_click(|_, window, cx| {
                                 window.dispatch_action(Box::new(OpenFolder), cx)
                             }),
@@ -2026,13 +2023,13 @@ impl Shell {
                                 .text_size(TEXT_SM)
                                 .font_weight(FontWeight::MEDIUM)
                                 .text_color(g.text)
-                                .child("Abrir Pasta de Projeto"),
+                                .child("Open Project Folder"),
                         )
                         .child(
                             div()
                                 .text_size(TEXT_XS)
                                 .text_color(g.text_muted)
-                                .child("Navegue entre todos os arquivos .dbml de forma integrada."),
+                                .child("Browse all .dbml files in your project folder seamlessly."),
                         )
                         .child(
                             div().mt(px(4.)).child(
@@ -2040,7 +2037,7 @@ impl Shell {
                                     .primary()
                                     .small()
                                     .icon(IconName::FolderOpen)
-                                    .label("Abrir pasta…")
+                                    .label("Open Folder…")
                                     .on_click(|_, window, cx| {
                                         window.dispatch_action(Box::new(OpenFolder), cx)
                                     }),
@@ -2060,7 +2057,7 @@ impl Shell {
             let name = t.name.clone();
             let tint = t.color.as_deref().and_then(hex);
             Self::row(g, SharedString::from(format!("side-{}", t.name)), on)
-                .aria_label(format!("Tabela {}", t.name))
+                .aria_label(format!("Table {}", t.name))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     let n = name.clone();
                     this.with_diagram(cx, |d| d.focus_table(&n));
@@ -2126,7 +2123,7 @@ impl Shell {
                     .text_size(TEXT_XS)
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(g.text_faint)
-                    .child("Sem grupo"),
+                    .child("No group"),
             );
         }
         for t in loose {
@@ -2153,9 +2150,9 @@ impl Shell {
         div()
             .flex()
             .flex_col()
-            .child(Self::section(g, "TABELAS", Some(schema.tables.len())))
+            .child(Self::section(g, "TABLES", Some(schema.tables.len())))
             .child(body)
-            .child(Self::section(g, "RELAÇÕES", Some(schema.refs.len())))
+            .child(Self::section(g, "RELATIONS", Some(schema.refs.len())))
             .child(refs)
     }
 
@@ -2193,7 +2190,7 @@ impl Shell {
                                 div()
                                     .text_size(TEXT_XS)
                                     .text_color(g.text_faint)
-                                    .child(format!("{} · linha {line}", doc.title)),
+                                    .child(format!("{} · line {line}", doc.title)),
                             ),
                     ),
             );
@@ -2208,14 +2205,14 @@ impl Shell {
                 .text_size(TEXT_SM)
                 .text_color(g.text_muted)
                 .child(Icon::new(IconName::CircleCheck).text_color(g.ok))
-                .child("Nenhum problema encontrado.")
+                .child("No problems found.")
         } else {
             list
         };
         div()
             .flex()
             .flex_col()
-            .child(Self::section(g, "PROBLEMAS", Some(doc.diags.len())))
+            .child(Self::section(g, "PROBLEMS", Some(doc.diags.len())))
             .child(body)
     }
 
@@ -2228,7 +2225,7 @@ impl Shell {
         div()
             .id("sidebar")
             .role(Role::Region)
-            .aria_label("Barra lateral")
+            .aria_label("Sidebar")
             .size_full()
             .bg(g.sidebar)
             .overflow_y_scroll()
@@ -2310,11 +2307,11 @@ impl Shell {
                 .flex()
                 .flex_col()
                 .child(header(
-                    "SELEÇÃO",
-                    format!("{} tabelas", selection.len()),
-                    "Shift+clique adiciona ou remove".into(),
+                    "SELECTION",
+                    format!("{} tables", selection.len()),
+                    "Shift+click adds or removes".into(),
                 ))
-                .child(Self::section(g, "TABELAS", None))
+                .child(Self::section(g, "TABLES", None))
                 .child(list)
                 .child(
                     div().p(SP_MD).flex().flex_col().gap(SP_SM).child(
@@ -2323,9 +2320,9 @@ impl Shell {
                             .small()
                             .w_full()
                             .icon(IconName::LayoutGrid)
-                            .label("Agrupar seleção")
+                            .label("Group selection")
                             .tooltip_with_action(
-                                "Agrupar tabelas selecionadas",
+                                "Group selected tables",
                                 &GroupSelection,
                                 Some(actions::CTX),
                             )
@@ -2353,7 +2350,7 @@ impl Shell {
                         div()
                             .id(id)
                             .role(Role::Button)
-                            .aria_label(format!("Editar {text}"))
+                            .aria_label(format!("Edit {text}"))
                             .w_full()
                             .px(px(4.))
                             .rounded(px(4.))
@@ -2385,7 +2382,7 @@ impl Shell {
                 .text_size(px(10.))
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(g.text_faint)
-                .child(div().flex_1().min_w(px(60.)).child("NOME"))
+                .child(div().flex_1().min_w(px(60.)).child("NAME"))
                 .child(
                     div()
                         .id("col-splitter-hdr")
@@ -2397,10 +2394,8 @@ impl Shell {
                         .justify_center()
                         .cursor(CursorStyle::ResizeLeftRight)
                         .tooltip(|window, cx| {
-                            Tooltip::new(
-                                "Arrastar para redimensionar colunas (duplo-clique restaura)",
-                            )
-                            .build(window, cx)
+                            Tooltip::new("Drag to resize columns (double-click to reset)")
+                                .build(window, cx)
                         })
                         .hover(|s| s.bg(g.hover).rounded(px(2.)))
                         .on_mouse_down(
@@ -2417,7 +2412,7 @@ impl Shell {
                         )
                         .child(div().w(px(1.5)).h(px(10.)).bg(g.edge)),
                 )
-                .child(div().flex_none().w(px(col_type_w)).child("TIPO"))
+                .child(div().flex_none().w(px(col_type_w)).child("TYPE"))
                 .child(div().flex_none().w(px(62.)).child("FLAGS"))
                 .child(div().w(px(16.)));
             cols = cols.child(col_header);
@@ -2431,13 +2426,13 @@ impl Shell {
                     div()
                         .id(SharedString::from(id))
                         .role(Role::Switch)
-                        .aria_label(format!("{label} em {}", c.name))
+                        .aria_label(format!("{label} on {}", c.name))
                         .tooltip(move |window, cx| {
                             Tooltip::new(match flag {
-                                "pk" => "Chave primária",
-                                "fk" => "Chave estrangeira (FK)",
-                                "not null" => "Obrigatória (not null)",
-                                _ => "Valor único",
+                                "pk" => "Primary key",
+                                "fk" => "Foreign key (FK)",
+                                "not null" => "Required (not null)",
+                                _ => "Unique value",
                             })
                             .build(window, cx)
                         })
@@ -2546,7 +2541,7 @@ impl Shell {
                                         .ghost()
                                         .xsmall()
                                         .icon(IconName::Trash)
-                                        .tooltip("Excluir coluna")
+                                        .tooltip("Delete column")
                                         .on_click(cx.listener(move |this, _, window, cx| {
                                             let (t2, c2) = (table.clone(), col.clone());
                                             this.edit_text(false, window, cx, |text| {
@@ -2578,7 +2573,7 @@ impl Shell {
                     }
                     for en in &enums {
                         if query.is_empty() || en.to_ascii_lowercase().contains(&query) {
-                            suggestions.push((en.as_str(), "enumeração"));
+                            suggestions.push((en.as_str(), "enumeration"));
                         }
                     }
                     suggestions.truncate(8);
@@ -2607,8 +2602,8 @@ impl Shell {
                                 .border_color(g.edge_soft)
                                 .text_size(px(10.))
                                 .text_color(g.text_faint)
-                                .child("Sugestões de tipo (clique para aplicar)")
-                                .child("Esc fecha"),
+                                .child("Type suggestions (click to apply)")
+                                .child("Esc closes"),
                         );
 
                         for (s_type, s_desc) in suggestions {
@@ -2667,7 +2662,7 @@ impl Shell {
                             .ghost()
                             .small()
                             .icon(IconName::Plus)
-                            .label("Adicionar coluna")
+                            .label("Add column")
                             .on_click(cx.listener(move |this, _, window, cx| {
                                 this.add_column_to(add_table.clone(), window, cx)
                             })),
@@ -2722,7 +2717,7 @@ impl Shell {
                                 .ghost()
                                 .xsmall()
                                 .icon(IconName::Trash)
-                                .tooltip("Excluir relação e coluna FK")
+                                .tooltip("Delete relation and FK column")
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     let (f, t) =
                                         ((ft.clone(), fc.clone()), (tt.clone(), tc.clone()));
@@ -2748,7 +2743,7 @@ impl Shell {
                     div()
                         .id(("swatch", i))
                         .role(Role::Button)
-                        .aria_label(format!("Cor {label}"))
+                        .aria_label(format!("Color {label}"))
                         .tooltip(move |window, cx| Tooltip::new(*label).build(window, cx))
                         .size(px(22.))
                         .rounded_full()
@@ -2769,8 +2764,8 @@ impl Shell {
                 div()
                     .id("swatch-none")
                     .role(Role::Button)
-                    .aria_label("Sem cor")
-                    .tooltip(|window, cx| Tooltip::new("Sem cor").build(window, cx))
+                    .aria_label("No color")
+                    .tooltip(|window, cx| Tooltip::new("No color").build(window, cx))
                     .size(px(22.))
                     .rounded_full()
                     .border_1()
@@ -2805,9 +2800,9 @@ impl Shell {
                         Button::new("insp-ungroup")
                             .ghost()
                             .xsmall()
-                            .label("Desagrupar")
+                            .label("Ungroup")
                             .tooltip_with_action(
-                                "Tirar a tabela do grupo",
+                                "Remove table from group",
                                 &UngroupSelection,
                                 Some(actions::CTX),
                             )
@@ -2819,7 +2814,7 @@ impl Shell {
                     .px(SP_MD)
                     .text_size(TEXT_SM)
                     .text_color(g.text_faint)
-                    .child("Sem grupo · Shift+clique em outras tabelas e Ctrl+G para agrupar"),
+                    .child("No group · Shift+click other tables and press Ctrl+G to group"),
             };
             div()
                 .flex()
@@ -2837,7 +2832,7 @@ impl Shell {
                                 .text_size(TEXT_XS)
                                 .font_weight(FontWeight::MEDIUM)
                                 .text_color(g.text_faint)
-                                .child("TABELA"),
+                                .child("TABLE"),
                         )
                         .child(
                             div()
@@ -2849,16 +2844,16 @@ impl Shell {
                             div()
                                 .text_size(TEXT_SM)
                                 .text_color(g.text_muted)
-                                .child(format!("{} colunas · F2 renomeia", t.columns.len())),
+                                .child(format!("{} columns · F2 to rename", t.columns.len())),
                         ),
                 )
-                .child(Self::section(g, "COR", None))
+                .child(Self::section(g, "COLOR", None))
                 .child(swatches)
-                .child(Self::section(g, "GRUPO", None))
+                .child(Self::section(g, "GROUP", None))
                 .child(group_row)
-                .child(Self::section(g, "COLUNAS", None))
+                .child(Self::section(g, "COLUMNS", None))
                 .child(cols)
-                .child(Self::section(g, "RELAÇÕES", None))
+                .child(Self::section(g, "RELATIONS", None))
                 .child(rels)
                 .child(
                     div()
@@ -2871,9 +2866,9 @@ impl Shell {
                                 .ghost()
                                 .small()
                                 .icon(IconName::Trash)
-                                .label("Excluir tabela")
+                                .label("Delete table")
                                 .tooltip_with_action(
-                                    "Excluir tabela",
+                                    "Delete table",
                                     &DeleteSelection,
                                     Some(actions::CANVAS),
                                 )
@@ -2909,14 +2904,14 @@ impl Shell {
                                 .text_size(TEXT_BASE)
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .text_color(g.text)
-                                .child("Nada selecionado"),
+                                .child("Nothing selected"),
                         )
                         .child(
                             Button::new("btn-hide-inspector")
                                 .ghost()
                                 .xsmall()
                                 .icon(IconName::PanelRightClose)
-                                .tooltip("Ocultar inspector (Ctrl+I)")
+                                .tooltip("Hide inspector (Ctrl+I)")
                                 .on_click(|_, window, cx| {
                                     window.dispatch_action(Box::new(ToggleInspector), cx)
                                 }),
@@ -2926,15 +2921,15 @@ impl Shell {
                     div()
                         .text_size(TEXT_SM)
                         .text_color(g.text_muted)
-                        .child("Clique numa tabela para ver colunas, cor, grupo e relações. Shift+clique seleciona várias."),
+                        .child("Click a table to view columns, color, group, and relations. Shift+click selects multiple."),
                 )
                 .child(div().h(px(1.)).my(SP_SM).bg(g.edge))
-                .child(tip(&ToolSelect, actions::CANVAS, "Selecionar"))
-                .child(tip(&ToolHand, actions::CANVAS, "Mover a vista"))
-                .child(tip(&FitView, actions::CANVAS, "Ajustar à tela"))
-                .child(tip(&GroupSelection, actions::CTX, "Agrupar seleção"))
-                .child(tip(&ToggleEditor, actions::CTX, "Editor DBML"))
-                .child(tip(&OpenPalette, actions::CTX, "Todos os comandos"))
+                .child(tip(&ToolSelect, actions::CANVAS, "Select"))
+                .child(tip(&ToolHand, actions::CANVAS, "Pan view"))
+                .child(tip(&FitView, actions::CANVAS, "Fit to screen"))
+                .child(tip(&GroupSelection, actions::CTX, "Group selection"))
+                .child(tip(&ToggleEditor, actions::CTX, "DBML Editor"))
+                .child(tip(&OpenPalette, actions::CTX, "All commands"))
         };
         div()
             .id("inspector")
@@ -2976,7 +2971,7 @@ impl Shell {
                             .xsmall()
                             .icon(IconName::Sparkles)
                             .tooltip_with_action(
-                                "Formatar documento",
+                                "Format Document",
                                 &FormatDocument,
                                 Some(actions::CTX),
                             )
@@ -2989,7 +2984,7 @@ impl Shell {
                             .ghost()
                             .xsmall()
                             .icon(IconName::X)
-                            .tooltip_with_action("Fechar editor", &ToggleEditor, Some(actions::CTX))
+                            .tooltip_with_action("Close Editor", &ToggleEditor, Some(actions::CTX))
                             .on_click(|_, window, cx| {
                                 window.dispatch_action(Box::new(ToggleEditor), cx)
                             }),
@@ -3015,19 +3010,19 @@ impl Shell {
             .child(crate::widgets::empty_state(
                 g,
                 IconName::Database,
-                "Nenhum arquivo aberto",
-                "Abra uma pasta de projeto ou comece um esquema novo.",
+                "No file open",
+                "Open a project folder or start a new schema.",
                 crate::widgets::EmptyAction {
                     id: "empty-folder",
                     icon: IconName::FolderOpen,
-                    label: "Abrir pasta",
+                    label: "Open Folder",
                     keys: "Ctrl+Shift+O",
                     action: Box::new(OpenFolder),
                 },
                 crate::widgets::EmptyAction {
                     id: "empty-new",
                     icon: IconName::Plus,
-                    label: "Novo arquivo",
+                    label: "New File",
                     keys: "Ctrl+N",
                     action: Box::new(NewFile),
                 },
@@ -3076,7 +3071,7 @@ impl Shell {
                         .child(w.to_string()),
                 )
                 .child(format!(
-                    "{} tabelas · {} relações",
+                    "{} tables · {} relations",
                     s.tables.len(),
                     s.refs.len()
                 ))
@@ -3096,9 +3091,9 @@ impl Shell {
         bar.child(format!("v{}", env!("CARGO_PKG_VERSION")))
             .child("DBML")
             .child(if self.mode == Mode::Dark {
-                "Escuro"
+                "Dark"
             } else {
-                "Claro"
+                "Light"
             })
     }
 }

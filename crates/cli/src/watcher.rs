@@ -12,14 +12,14 @@ pub fn start_file_watcher(state: AppState) -> anyhow::Result<()> {
         let mut watcher = match RecommendedWatcher::new(tx, Config::default()) {
             Ok(w) => w,
             Err(e) => {
-                eprintln!("Aviso: Não foi possível inicializar o file watcher: {e}");
+                eprintln!("Warning: Could not initialize file watcher: {e}");
                 return;
             }
         };
 
         if let Err(e) = watcher.watch(&file_path, RecursiveMode::NonRecursive) {
             eprintln!(
-                "Aviso: Falha ao monitorar arquivo '{}': {e}",
+                "Warning: Failed to watch file '{}': {e}",
                 file_path.display()
             );
             return;
@@ -62,14 +62,14 @@ pub fn start_file_watcher(state: AppState) -> anyhow::Result<()> {
 
                                 let _ = state.tx.send(msg);
                                 println!(
-                                    "  [sync] Alteração externa detectada e propagada para o navegador."
+                                    "  [sync] External change detected and broadcast to browser."
                                 );
                             }
                         });
                     }
                 }
                 Err(e) => {
-                    eprintln!("Erro no watcher: {e}");
+                    eprintln!("Watcher error: {e}");
                 }
             }
         }

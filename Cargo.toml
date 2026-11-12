@@ -5,24 +5,74 @@ members = ["crates/*"]
 [workspace.package]
 edition = "2024"
 version = "0.1.2"
+license = "MIT"
 publish = false
 
 [workspace.dependencies]
-logos = "=0.16.1"
-rowan = "=0.18.0-alpha.2"
-insta = "=1.49.0"
-proptest = "=1.12.0"
+# Internal workspace crates
 schema = { path = "crates/schema" }
 dbml-syntax = { path = "crates/dbml-syntax" }
 dbml-analysis = { path = "crates/dbml-analysis" }
 dbml-edit = { path = "crates/dbml-edit" }
 layout = { path = "crates/layout" }
 
-# Build de desenvolvimento otimizado: o GPUI sem otimização fica de 10 a 50x mais lento
-# para renderizar. Mantém debug_assertions (o build Windows cruzado depende delas para
-# compilar os shaders em tempo de execução).
+# Parsing & CST
+logos = "=0.16.1"
+rowan = "=0.18.0-alpha.2"
+
+# Serialization & Error Handling
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "=1.0.104"
+
+# Desktop UI & Platform (crates/app)
+gpui-kit = "=0.8.0"
+lsp-types = "=0.97.0"
+embed-resource = "=3.0.12"
+
+# CLI & Web Server (crates/cli & crates/app)
+clap = { version = "4.5", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["ws"] }
+futures-util = "0.3"
+notify = "8"
+rust-embed = "=8.13.0"
+mime_guess = "2.0"
+colored = "3.0"
+opener = "0.7"
+
+# WebAssembly (crates/dbml-wasm)
+wasm-bindgen = "0.2"
+serde-wasm-bindgen = "0.6"
+
+# Dev / Testing
+insta = "=1.49.0"
+proptest = "=1.12.0"
+
+# Optimized development build: GPUI without optimization is 10-50x slower to render.
+# Keeps debug_assertions enabled (Windows cross-build relies on them to compile
+# shaders at runtime) and uses line-tables-only debug info for faster incremental links.
 [profile.dev]
 opt-level = 1
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 3
+debug = false
+
+# Production release profile with Thin LTO, single codegen unit, symbol stripping, and panic=abort.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
+# Size-optimized release override for the WebAssembly bundle.
+[profile.release.package.dbml-wasm]
+opt-level = "s"
+
+# Distribution profile with Fat LTO for maximum whole-program optimization.
+[profile.dist]
+inherits = "release"
+lto = "fat"

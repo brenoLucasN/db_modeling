@@ -1,15 +1,14 @@
-# Labels de triagem
+# Triage Labels
 
-As skills falam em cinco papéis canônicos de triagem. Este arquivo mapeia esses papéis para
-os valores usados na linha `Status:` das issues deste repositório.
+Skills refer to five canonical triage roles. This file maps those roles to the values
+used on the `Status:` line of issues in this repository.
 
-| Papel no mattpocock/skills | Valor no nosso tracker | Significado |
-| -------------------------- | ---------------------- | ----------- |
-| `needs-triage`             | `precisa-triagem`      | O mantenedor precisa avaliar a issue |
-| `needs-info`               | `precisa-info`         | Aguardando mais informações de quem abriu |
-| `ready-for-agent`          | `pronto-para-agente`   | Totalmente especificada, pronta para um agente sem supervisão |
-| `ready-for-human`          | `pronto-para-humano`   | Exige implementação humana |
-| `wontfix`                  | `nao-sera-feito`       | Não será tratada |
+| Role in mattpocock/skills | Value in our tracker | Meaning |
+| ------------------------- | -------------------- | ------- |
+| `needs-triage`            | `needs-triage`       | Maintainer needs to evaluate the issue |
+| `needs-info`              | `needs-info`         | Waiting for more information from the author |
+| `ready-for-agent`         | `ready-for-agent`    | Fully specified, ready for an autonomous agent |
+| `ready-for-human`         | `ready-for-human`    | Requires human implementation |
+| `wontfix`                 | `wontfix`            | Will not be addressed |
 
-Quando uma skill citar um papel (ex.: "aplicar a label de pronto para agente"), usar o valor
-correspondente desta tabela.
+When a skill refers to a triage role (e.g., "apply the ready-for-agent label"), use the corresponding value from this table.

@@ -3,76 +3,76 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(name = "dbml")]
-#[command(about = "DB Modeling CLI - Visualizador e editor interativo de banco de dados")]
+#[command(about = "DB Modeling CLI - Interactive database schema viewer and editor")]
 #[command(version)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
 
-    /// Caminho para o arquivo .dbml (quando executado diretamente como `dbml schema.dbml`)
-    #[arg(value_name = "ARQUIVO")]
+    /// Path to the .dbml file (when executed directly as `dbml schema.dbml`)
+    #[arg(value_name = "FILE")]
     pub file: Option<PathBuf>,
 
-    /// Porta do servidor web local
+    /// Local web server port
     #[arg(short, long, default_value_t = 3000)]
     pub port: u16,
 
-    /// Endereço de bind
+    /// Bind address
     #[arg(long, default_value = "127.0.0.1")]
     pub host: String,
 
-    /// Não abre o navegador automaticamente após iniciar
+    /// Do not open browser automatically on startup
     #[arg(long)]
     pub no_open: bool,
 
-    /// Desativa o monitoramento de alterações externas no arquivo
+    /// Disable watching for external file changes
     #[arg(long)]
     pub no_watch: bool,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Inicia o servidor local e abre o canvas visual no navegador
+    /// Start the local server and open the visual canvas in the browser
     Run {
-        /// Caminho para o arquivo .dbml
-        #[arg(value_name = "ARQUIVO")]
+        /// Path to the .dbml file
+        #[arg(value_name = "FILE")]
         file: PathBuf,
 
-        /// Porta do servidor web local
+        /// Local web server port
         #[arg(short, long, default_value_t = 3000)]
         port: u16,
 
-        /// Endereço de bind
+        /// Bind address
         #[arg(long, default_value = "127.0.0.1")]
         host: String,
 
-        /// Não abre o navegador automaticamente
+        /// Do not open browser automatically
         #[arg(long)]
         no_open: bool,
 
-        /// Desativa o monitoramento de alterações externas
+        /// Disable watching for external file changes
         #[arg(long)]
         no_watch: bool,
     },
-    /// Alias para iniciar o servidor web
+    /// Alias to start the web server
     Serve {
-        /// Caminho para o arquivo .dbml
-        #[arg(value_name = "ARQUIVO")]
+        /// Path to the .dbml file
+        #[arg(value_name = "FILE")]
         file: PathBuf,
 
-        /// Porta do servidor web local
+        /// Local web server port
         #[arg(short, long, default_value_t = 3000)]
         port: u16,
 
-        /// Endereço de bind
+        /// Bind address
         #[arg(long, default_value = "127.0.0.1")]
         host: String,
 
-        /// Não abre o navegador automaticamente
+        /// Do not open browser automatically
         #[arg(long)]
         no_open: bool,
 
-        /// Desativa o monitoramento de alterações externas
+        /// Disable watching for external file changes
         #[arg(long)]
         no_watch: bool,
     },
@@ -119,7 +119,7 @@ impl Cli {
                         no_watch: self.no_watch,
                     })
                 } else {
-                    anyhow::bail!("Nenhum arquivo .dbml informado. Uso: dbml run <arquivo.dbml>");
+                    anyhow::bail!("No .dbml file specified. Usage: dbml run <file.dbml>");
                 }
             }
         }

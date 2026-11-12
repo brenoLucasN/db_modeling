@@ -2,7 +2,8 @@
 name = "schema"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 publish.workspace = true
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde.workspace = true

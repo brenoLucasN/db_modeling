@@ -1,6 +1,6 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
-//! DB Modeling: modelagem de banco de dados com DBML ↔ canvas.
+//! DB Modeling: visual database modeling with DBML ↔ canvas.
 
 mod actions;
 mod canvas;
@@ -51,18 +51,18 @@ fn main() {
     }
     if std::env::args().any(|a| a == "--help" || a == "-h") {
         println!("DB Modeling {}", env!("CARGO_PKG_VERSION"));
-        println!("Modelagem de banco de dados no canvas ou no texto com DBML\n");
-        println!("Uso: db-modeling [ARQUIVO.dbml | PASTA]\n");
-        println!("Opções:");
-        println!("  -v, -V, --version   Exibe a versão do aplicativo");
-        println!("  -h, --help          Exibe esta ajuda");
+        println!("Visual database schema modeling on the canvas or in DBML text\n");
+        println!("Usage: db-modeling [FILE.dbml | FOLDER]\n");
+        println!("Options:");
+        println!("  -v, -V, --version   Show application version");
+        println!("  -h, --help          Show this help message");
         return;
     }
     gpui_kit::application().with_assets(AppAssets).run(|cx| {
         gpui_kit::init(cx);
         cx.text_system()
             .add_fonts(FONTS.iter().map(|f| Cow::Borrowed(*f)).collect())
-            .expect("fontes embarcadas válidas");
+            .expect("valid embedded fonts");
         cx.bind_keys(actions::catalog().into_iter().filter_map(|e| e.binding));
         let (background, translucent) = platform::window_background();
         // DBM_SIZE=LxA abre a janela nesse tamanho (harness de screenshot do responsivo)

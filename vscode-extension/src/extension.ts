@@ -17,7 +17,7 @@ class DbmlWorkspaceTreeProvider implements vscode.TreeDataProvider<vscode.Uri> {
     item.tooltip = uri.fsPath;
     item.command = {
       command: 'dbmodeling.openCanvas',
-      title: 'Abrir no DB Modeling',
+      title: 'Open in DB Modeling',
       arguments: [uri],
     };
     return item;
@@ -47,7 +47,7 @@ async function openWorkbench(context: vscode.ExtensionContext): Promise<void> {
   const sample = new TextDecoder().decode(bytes);
   const folder = vscode.workspace.workspaceFolders?.[0]?.uri;
   if (folder) {
-    const target = vscode.Uri.joinPath(folder, 'exemplo.dbml');
+    const target = vscode.Uri.joinPath(folder, 'example.dbml');
     await vscode.workspace.fs.writeFile(target, bytes);
     return openInCanvas(target);
   }
@@ -56,7 +56,7 @@ async function openWorkbench(context: vscode.ExtensionContext): Promise<void> {
 }
 
 async function newFile(): Promise<void> {
-  const content = 'Table exemplo {\n  id int [pk]\n  nome varchar(255)\n}\n';
+  const content = 'Table example {\n  id int [pk]\n  name varchar(255)\n}\n';
   const folder = vscode.workspace.workspaceFolders?.[0]?.uri;
   if (!folder) {
     const doc = await vscode.workspace.openTextDocument({ language: 'dbml', content });
@@ -65,7 +65,7 @@ async function newFile(): Promise<void> {
   let n = 0;
   let target: vscode.Uri;
   for (;;) {
-    target = vscode.Uri.joinPath(folder, n === 0 ? 'novo-esquema.dbml' : `novo-esquema-${n}.dbml`);
+    target = vscode.Uri.joinPath(folder, n === 0 ? 'new-schema.dbml' : `new-schema-${n}.dbml`);
     try {
       await vscode.workspace.fs.stat(target);
       n++;
@@ -110,7 +110,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Botão sempre visível na barra de status do VS Code
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   status.text = '$(database) DB Modeling';
-  status.tooltip = 'Abrir o DB Modeling';
+  status.tooltip = 'Open DB Modeling';
   status.command = 'dbmodeling.openWorkbench';
   status.show();
   context.subscriptions.push(status);

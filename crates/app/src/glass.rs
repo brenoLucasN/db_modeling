@@ -63,14 +63,14 @@ impl Mode {
 
 /// Paleta para cor de tabelas e grupos (DBML `headercolor` / `color`).
 pub const TABLE_COLORS: [(&str, &str); 8] = [
-    ("Azul", "#3b82f6"),
-    ("Ciano", "#06b6d4"),
-    ("Verde", "#22c55e"),
-    ("Lima", "#84cc16"),
-    ("Âmbar", "#f59e0b"),
-    ("Laranja", "#f97316"),
-    ("Rosa", "#ec4899"),
-    ("Violeta", "#8b5cf6"),
+    ("Blue", "#3b82f6"),
+    ("Cyan", "#06b6d4"),
+    ("Green", "#22c55e"),
+    ("Lime", "#84cc16"),
+    ("Amber", "#f59e0b"),
+    ("Orange", "#f97316"),
+    ("Pink", "#ec4899"),
+    ("Violet", "#8b5cf6"),
 ];
 
 /// Sombra suave e curta dos cartões de tabela (sempre presente).

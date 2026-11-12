@@ -1,15 +1,15 @@
-# DB Modeling para VS Code
+# DB Modeling for VS Code
 
-Extensão oficial do **DB Modeling** para o Visual Studio Code. Permite visualização e modelagem bidirecional de bancos de dados relacionais utilizando o formato **DBML**.
+Official **DB Modeling** extension for Visual Studio Code. Provides visual, bidirectional relational database modeling powered by **DBML (Database Markup Language)**.
 
-## Recursos
+## Features
 
-- **Canvas Interativo:** Renderização de tabelas, colunas, chaves primárias e relacionamentos com curvas suaves.
-- **Sincronização em Tempo Real:** Edições no texto refletem no canvas, e edições visuais viram patches no documento `.dbml`.
-- **Desfazer/Refazer Unificado:** Totalmente integrado ao histórico nativo de Undo/Redo (`Ctrl+Z` / `Ctrl+Y`) do VS Code.
-- **Sidecar de Layout:** Preserva posições visuais no arquivo `<schema>.dbml.layout.json`.
+- **Interactive Canvas:** Render tables, columns, primary/foreign keys, groups, and orthogonal relationships.
+- **Real-Time Bidirectional Sync:** Text edits update the canvas immediately, and visual edits generate minimal textual patches in your `.dbml` document.
+- **Unified Undo/Redo:** Fully integrated with VS Code's native Undo/Redo stack (`Ctrl+Z` / `Ctrl+Y`).
+- **Deterministic Layout Sidecar:** Preserves visual positions and colors in `<schema>.dbml.layout.json`.
 
-## Como Usar
+## How to Use
 
-1. Abra qualquer arquivo `.dbml` no VS Code.
-2. Clique no ícone de canvas no topo da aba do editor ou execute o comando `DB Modeling: Abrir no Canvas Visual` na paleta (`Ctrl+Shift+P`).
+1. Open any `.dbml` file in VS Code.
+2. Click the canvas icon in the editor title bar or run `DB Modeling: Open in Visual Canvas` from the Command Palette (`Ctrl+Shift+P`).

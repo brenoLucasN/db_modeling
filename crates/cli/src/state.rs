@@ -19,16 +19,11 @@ pub async fn atomic_write(path: &Path, content: &str) -> anyhow::Result<()> {
 
     tokio::fs::write(&tmp_path, content)
         .await
-        .with_context(|| {
-            format!(
-                "Falha ao gravar arquivo temporário '{}'",
-                tmp_path.display()
-            )
-        })?;
+        .with_context(|| format!("Failed to write temporary file '{}'", tmp_path.display()))?;
 
     tokio::fs::rename(&tmp_path, path)
         .await
-        .with_context(|| format!("Falha ao renomear arquivo para '{}'", path.display()))?;
+        .with_context(|| format!("Failed to rename file to '{}'", path.display()))?;
 
     Ok(())
 }
@@ -49,13 +44,13 @@ impl AppState {
 
         // Cria arquivo com template inicial se não existir
         if !file_path.exists() {
-            let initial_dbml = "// Documento DBML\n\nTable users {\n  id int [pk]\n  name varchar\n  email varchar [unique]\n}\n\nTable posts {\n  id int [pk]\n  user_id int\n  title varchar\n}\n\nRef: posts.user_id > users.id\n";
+            let initial_dbml = "// DBML Document\n\nTable users {\n  id int [pk]\n  name varchar\n  email varchar [unique]\n}\n\nTable posts {\n  id int [pk]\n  user_id int\n  title varchar\n}\n\nRef: posts.user_id > users.id\n";
             atomic_write(&file_path, initial_dbml).await?;
         }
 
         let content = tokio::fs::read_to_string(&file_path)
             .await
-            .with_context(|| format!("Não foi possível ler o arquivo '{}'", file_path.display()))?;
+            .with_context(|| format!("Could not read file '{}'", file_path.display()))?;
 
         let hash = compute_hash(&content);
 

@@ -1,130 +1,126 @@
 #!/usr/bin/env bash
-# Build do binário release e geração de pacote RPM para Fedora / DNF.
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+# Build .rpm package for Fedora / RHEL / openSUSE
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 
-echo "==> Verificando dependências de empacotamento..."
-if ! command -v rpmbuild &>/dev/null; then
-    echo "Erro: 'rpmbuild' não foi encontrado."
-    echo "Instale com: sudo dnf install rpm-build"
+VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')"
+ARCH="$(uname -m)"
+PKG_NAME="db-modeling"
+DIST_DIR="${ROOT_DIR}/dist"
+RPMBUILD_DIR="${ROOT_DIR}/target/rpmbuild"
+
+echo "==> Checking Fedora/RPM build dependencies..."
+if ! command -v rpmbuild >/dev/null 2>&1; then
+    echo "Error: 'rpmbuild' not found. Install it on Fedora with:"
+    echo "  sudo dnf install rpm-build rpmdevtools"
     exit 1
 fi
 
-echo "==> Compilando DB Modeling (App Desktop + CLI Web) em modo release..."
-cargo build --release -p app -p dbml-cli
+echo "==> Building binary in release mode (v${VERSION})..."
+cargo build --release -p app
 
-VERSION="$(cargo pkgid -p app | cut -d# -f2 | cut -d: -f2 2>/dev/null || sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
-NAME="db-modeling"
-TOPDIR="$(pwd)/target/rpmbuild"
-DISTDIR="$(pwd)/dist"
+echo "==> Preparing rpmbuild tree at ${RPMBUILD_DIR}..."
+rm -rf "${RPMBUILD_DIR}"
+mkdir -p "${RPMBUILD_DIR}"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-echo "==> Versão detectada no workspace: $VERSION"
-echo "==> Preparando estrutura do RPM..."
-rm -rf "$TOPDIR"
-mkdir -p "$TOPDIR"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
-mkdir -p "$DISTDIR"
+STAGE_ROOT="${RPMBUILD_DIR}/SOURCES/${PKG_NAME}-${VERSION}"
+mkdir -p "${STAGE_ROOT}/usr/bin"
+mkdir -p "${STAGE_ROOT}/usr/share/applications"
+mkdir -p "${STAGE_ROOT}/usr/share/icons/hicolor/scalable/apps"
+mkdir -p "${STAGE_ROOT}/usr/share/icons/hicolor/256x256/apps"
+mkdir -p "${STAGE_ROOT}/usr/share/mime/packages"
+mkdir -p "${STAGE_ROOT}/usr/share/licenses/${PKG_NAME}"
 
-STAGE_DIR="$TOPDIR/SOURCES/${NAME}-${VERSION}"
-mkdir -p "$STAGE_DIR/icons"
+cp "${ROOT_DIR}/target/release/app" "${STAGE_ROOT}/usr/bin/${PKG_NAME}"
+strip "${STAGE_ROOT}/usr/bin/${PKG_NAME}" || true
+chmod 0755 "${STAGE_ROOT}/usr/bin/${PKG_NAME}"
 
-cp target/release/app "$STAGE_DIR/db-modeling"
-cp target/release/dbml "$STAGE_DIR/dbml"
-cp crates/app/assets/brand/icon-*.png "$STAGE_DIR/icons/"
-cp crates/app/assets/brand/icon.svg "$STAGE_DIR/icons/"
+cp "${ROOT_DIR}/LICENSE" "${STAGE_ROOT}/usr/share/licenses/${PKG_NAME}/LICENSE"
+cp "${ROOT_DIR}/crates/app/assets/icon.svg" "${STAGE_ROOT}/usr/share/icons/hicolor/scalable/apps/${PKG_NAME}.svg"
+cp "${ROOT_DIR}/crates/app/assets/icon-256.png" "${STAGE_ROOT}/usr/share/icons/hicolor/256x256/apps/${PKG_NAME}.png"
 
-# Gera db-modeling.desktop inline
-cat <<EOF > "$STAGE_DIR/db-modeling.desktop"
+cat > "${STAGE_ROOT}/usr/share/applications/${PKG_NAME}.desktop" <<EOF
 [Desktop Entry]
-Name=DB Modeling
-GenericName=Modelador de Banco de Dados
-Comment=Modele bancos de dados no canvas ou no texto com DBML
-Exec=db-modeling %F
-Icon=db-modeling
-Terminal=false
+Version=1.0
 Type=Application
+Name=DB Modeling
+GenericName=Visual Database Modeler (DBML)
+Comment=Visual relational database schema modeling with DBML
+Exec=${PKG_NAME} %F
+Icon=${PKG_NAME}
+Terminal=false
 Categories=Development;Database;IDE;
-MimeType=text/x-dbml;
-Keywords=dbml;database;diagram;modeling;canvas;schema;sql;
+MimeType=application/x-dbml;text/x-dbml;
 StartupWMClass=db-modeling
+Keywords=dbml;database;schema;erd;diagram;sql;
 EOF
 
-tar -czf "$TOPDIR/SOURCES/${NAME}-${VERSION}.tar.gz" -C "$TOPDIR/SOURCES" "${NAME}-${VERSION}"
-rm -rf "$STAGE_DIR"
+cat > "${STAGE_ROOT}/usr/share/mime/packages/${PKG_NAME}.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-dbml">
+    <comment>DBML Schema</comment>
+    <glob pattern="*.dbml"/>
+    <sub-class-of type="text/plain"/>
+  </mime-type>
+</mime-info>
+EOF
 
-# Gera o db-modeling.spec inline parametrizado
-cat <<EOF > "$TOPDIR/SPECS/db-modeling.spec"
+SPEC_FILE="${RPMBUILD_DIR}/SPECS/${PKG_NAME}.spec"
+cat > "${SPEC_FILE}" <<EOF
 %global debug_package %{nil}
+%define _build_id_links none
 
-Name:           ${NAME}
+Name:           ${PKG_NAME}
 Version:        ${VERSION}
 Release:        1%{?dist}
-Summary:        Modele bancos de dados no canvas ou no texto com DBML
-
-License:        Apache-2.0
+Summary:        Visual Database Modeler powered by DBML
+License:        MIT
 URL:            https://github.com/smovisk/db_modeling
-Source0:        %{name}-%{version}.tar.gz
-
-BuildArch:      x86_64
-
-Requires:       libxkbcommon-x11%{?_isa}
-Requires:       libxcb%{?_isa}
-Requires:       freetype%{?_isa}
-Requires:       fontconfig%{?_isa}
-Requires:       vulkan-loader%{?_isa}
-Requires:       hicolor-icon-theme
+BuildArch:      ${ARCH}
+AutoReqProv:    no
+Requires:       glibc, libgcc, libstdc++, libxcb, libxkbcommon, libxkbcommon-x11, libwayland-client, vulkan-loader, fontconfig, freetype
 
 %description
-App desktop nativo para modelagem de banco de dados com foco total em UI/UX e
-edição bidirecional texto (DBML) e canvas visual, escrito em Rust e GPUI.
-
-%prep
-%autosetup
-
-%build
-# O binário release pré-compilado é empacotado
+Native, high-performance visual database schema editor using DBML as the canonical
+format. Features an interactive ER canvas, bidirectional DBML code editor,
+auto-layout, and high-resolution diagram export.
 
 %install
-rm -rf %{buildroot}
-install -d -m 0755 %{buildroot}%{_bindir}
-install -m 0755 db-modeling %{buildroot}%{_bindir}/db-modeling
-install -m 0755 dbml %{buildroot}%{_bindir}/dbml
+mkdir -p %{buildroot}
+cp -a ${STAGE_ROOT}/usr %{buildroot}/
 
-install -d -m 0755 %{buildroot}%{_datadir}/applications
-install -m 0644 db-modeling.desktop %{buildroot}%{_datadir}/applications/db-modeling.desktop
-
-for size in 16 24 32 48 64 128 256; do
-    install -d -m 0755 %{buildroot}%{_datadir}/icons/hicolor/\${size}x\${size}/apps
-    install -m 0644 icons/icon-\${size}.png %{buildroot}%{_datadir}/icons/hicolor/\${size}x\${size}/apps/db-modeling.png
-done
-
-install -d -m 0755 %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
-install -m 0644 icons/icon.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/db-modeling.svg
+%post
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q /usr/share/applications || true
+fi
+if command -v update-mime-database >/dev/null 2>&1; then
+    update-mime-database /usr/share/mime || true
+fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
+fi
 
 %files
-%{_bindir}/db-modeling
-%{_bindir}/dbml
-%{_datadir}/applications/db-modeling.desktop
-%{_datadir}/icons/hicolor/*/apps/db-modeling.png
-%{_datadir}/icons/hicolor/scalable/apps/db-modeling.svg
-
-%changelog
-* Sun Nov 01 2026 smovisk <smovisk@local> - ${VERSION}-1
-- Empacotamento RPM oficial para Fedora
+/usr/bin/${PKG_NAME}
+/usr/share/applications/${PKG_NAME}.desktop
+/usr/share/icons/hicolor/scalable/apps/${PKG_NAME}.svg
+/usr/share/icons/hicolor/256x256/apps/${PKG_NAME}.png
+/usr/share/mime/packages/${PKG_NAME}.xml
+/usr/share/licenses/${PKG_NAME}/LICENSE
 EOF
 
-echo "==> Gerando pacote RPM com rpmbuild..."
-rpmbuild --define "_topdir $TOPDIR" -bb "$TOPDIR/SPECS/db-modeling.spec"
+echo "==> Packaging .rpm with rpmbuild..."
+rpmbuild --define "_topdir ${RPMBUILD_DIR}" -bb "${SPEC_FILE}"
 
-cp "$TOPDIR"/RPMS/*/*.rpm "$DISTDIR"/
+mkdir -p "${DIST_DIR}"
+RPM_GENERATED="$(find "${RPMBUILD_DIR}/RPMS" -name "*.rpm" | head -n 1)"
+OUTPUT_RPM="${DIST_DIR}/db-modeling-v${VERSION}-${ARCH}.rpm"
 
-echo ""
-echo "=========================================================="
-echo " Pacote RPM gerado com sucesso!"
-echo " Localização:"
-ls -lh "$DISTDIR"/*.rpm
-echo ""
-echo " Para instalar ou atualizar no Fedora via DNF:"
-echo "   sudo dnf install ./dist/${NAME}-${VERSION}-1.*.rpm"
-echo "   sudo dnf upgrade ./dist/${NAME}-${VERSION}-1.*.rpm"
-echo "=========================================================="
+cp "${RPM_GENERATED}" "${DIST_DIR}/"
+cp "${RPM_GENERATED}" "${OUTPUT_RPM}"
+
+echo "==> Fedora (.rpm) package generated successfully:"
+echo "    ${OUTPUT_RPM}"

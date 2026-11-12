@@ -80,7 +80,7 @@ pub fn empty_state(
                 .text_size(TEXT_XS)
                 .text_color(g.text_faint)
                 .child(rule())
-                .child("ou")
+                .child("or")
                 .child(rule()),
         )
         .child(button(secondary, false))

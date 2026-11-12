@@ -1,7 +1,7 @@
 ---
-status: proposta
+status: accepted
 ---
 
-# DBML estrito como formato canônico
+# Strict DBML as canonical format
 
-O arquivo do usuário é sempre DBML válido, que abre no dbdiagram sem ajustes. Tudo o que é do app (posições, cores, views, opções de export) vai num sidecar JSON por schema (`schema.dbml.layout.json`, chaves em ordem estável). Rejeitamos linguagem própria (sem ecossistema) e superset de DBML (quebra compatibilidade). Detalhes em `docs/02-linguagem.md`.
+The user's file is always valid DBML that opens in dbdiagram.io without adjustments. Everything specific to the app (positions, colors, views, export options) lives in a JSON sidecar per schema (`schema.dbml.layout.json`, with keys in deterministic order). We rejected a custom language (no ecosystem) and a DBML superset (breaks compatibility). Details in `docs/02-linguagem.md`.

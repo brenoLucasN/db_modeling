@@ -107,7 +107,7 @@ pub fn ungroup_table(text: &str, table: &str) -> String {
     remove_members(text, &[table])
 }
 
-/// Primeiro nome livre `grupo_N`.
+/// First available `group_N` name.
 pub fn next_group_name(text: &str) -> String {
     let root = parse(text).syntax();
     let names: Vec<String> = root
@@ -116,7 +116,7 @@ pub fn next_group_name(text: &str) -> String {
         .filter_map(|n| name_of(&n))
         .collect();
     (1..)
-        .map(|i| format!("grupo_{i}"))
+        .map(|i| format!("group_{i}"))
         .find(|n| !names.contains(n))
         .unwrap()
 }
@@ -194,7 +194,7 @@ mod tests {
         let g2 = group_tables(&g, &["b"], "extra");
         assert!(g2.contains("TableGroup core {\n  a\n}\n"), "{g2}");
         assert!(g2.contains("TableGroup extra {\n  b\n}\n"), "{g2}");
-        assert_eq!(next_group_name(&g2), "grupo_1");
+        assert_eq!(next_group_name(&g2), "group_1");
     }
 
     #[test]

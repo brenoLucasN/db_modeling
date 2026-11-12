@@ -1,7 +1,7 @@
 {
   "name": "dbmodeling-vscode",
   "displayName": "DB Modeling",
-  "description": "Modelagem visual e bidirecional de bancos de dados com DBML no VS Code",
+  "description": "Visual and bidirectional relational database modeling with DBML in VS Code",
   "version": "0.1.1",
   "type": "module",
   "publisher": "dbmodeling",
@@ -46,7 +46,7 @@
       "dbmodeling-sidebar": [
         {
           "id": "dbmodeling.workspaceView",
-          "name": "Esquemas DBML",
+          "name": "DBML Schemas",
           "icon": "media/mark.svg",
           "contextualTitle": "DB Modeling"
         }
@@ -55,7 +55,7 @@
     "viewsWelcome": [
       {
         "view": "dbmodeling.workspaceView",
-        "contents": "Modele seu banco de dados visualmente, com as mesmas funcionalidades do app desktop.\n[Abrir DB Modeling](command:dbmodeling.openWorkbench)\n[Novo esquema DBML](command:dbmodeling.newFile)\nNenhum arquivo .dbml encontrado neste workspace."
+        "contents": "Model your database visually with full desktop workbench parity.\n[Open DB Modeling](command:dbmodeling.openWorkbench)\n[New DBML Schema](command:dbmodeling.newFile)\nNo .dbml files found in this workspace."
       }
     ],
     "customEditors": [
@@ -73,25 +73,25 @@
     "commands": [
       {
         "command": "dbmodeling.openWorkbench",
-        "title": "Abrir DB Modeling",
+        "title": "Open DB Modeling",
         "icon": "$(database)",
         "category": "DB Modeling"
       },
       {
         "command": "dbmodeling.newFile",
-        "title": "Novo Esquema DBML",
+        "title": "New DBML Schema",
         "icon": "$(add)",
         "category": "DB Modeling"
       },
       {
         "command": "dbmodeling.refresh",
-        "title": "Atualizar Lista",
+        "title": "Refresh List",
         "icon": "$(refresh)",
         "category": "DB Modeling"
       },
       {
         "command": "dbmodeling.openCanvas",
-        "title": "Abrir no Canvas Visual",
+        "title": "Open in Visual Canvas",
         "icon": "$(graph)",
         "category": "DB Modeling"
       }

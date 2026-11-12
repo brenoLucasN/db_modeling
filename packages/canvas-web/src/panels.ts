@@ -52,7 +52,7 @@ export function renderSchemaPane(
     `;
   };
 
-  let body = `<div class="dbm-section-hdr"><span>TABELAS</span><span>${schema.tables.length}</span></div>`;
+  let body = `<div class="dbm-section-hdr"><span>TABLES</span><span>${schema.tables.length}</span></div>`;
   body += `<div style="display:flex;flex-direction:column;gap:1px;">`;
 
   schema.groups.forEach((gr, idx) => {
@@ -72,14 +72,14 @@ export function renderSchemaPane(
   const groupedSet = new Set(schema.groups.flatMap((gr) => gr.tables));
   const loose = schema.tables.filter((t) => !groupedSet.has(t.name));
   if (schema.groups.length > 0 && loose.length > 0) {
-    body += `<div style="padding:8px 12px 2px 12px;font-size:12px;font-weight:600;color:${g.textFaint};">Sem grupo</div>`;
+    body += `<div style="padding:8px 12px 2px 12px;font-size:12px;font-weight:600;color:${g.textFaint};">No group</div>`;
   }
   for (const t of loose) {
     body += renderTableRow(t.name, false);
   }
   body += `</div>`;
 
-  body += `<div class="dbm-section-hdr"><span>RELAÇÕES</span><span>${schema.refs.length}</span></div>`;
+  body += `<div class="dbm-section-hdr"><span>RELATIONS</span><span>${schema.refs.length}</span></div>`;
   body += `<div style="display:flex;flex-direction:column;gap:2px;padding:0 12px 12px 12px;">`;
   for (const r of schema.refs) {
     body += `
@@ -99,12 +99,12 @@ export function renderProblemsPane(
   docTitle: string,
   g: Glass
 ): string {
-  let html = `<div class="dbm-section-hdr"><span>PROBLEMAS</span><span>${diags.length}</span></div>`;
+  let html = `<div class="dbm-section-hdr"><span>PROBLEMS</span><span>${diags.length}</span></div>`;
   if (diags.length === 0) {
     html += `
       <div style="padding:24px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;color:${g.textMuted};font-size:13px;">
         ${iconSvg('CircleCheck', 20, g.ok)}
-        <span>Nenhum problema encontrado.</span>
+        <span>No problems found.</span>
       </div>
     `;
     return html;
@@ -124,7 +124,7 @@ export function renderProblemsPane(
         <span style="padding-top:2px;">${icon}</span>
         <span style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;">
           <span style="color:${g.text};word-break:break-word;">${escHtml(d.message)}</span>
-          <span style="font-size:11.5px;color:${g.textFaint};">${escHtml(docTitle)} · linha ${lineNum}</span>
+          <span style="font-size:11.5px;color:${g.textFaint};">${escHtml(docTitle)} · line ${lineNum}</span>
         </span>
       </button>
     `;
@@ -160,16 +160,16 @@ export function renderInspectorPane(params: {
     return `
       <div style="display:flex;flex-direction:column;">
         <div style="display:flex;flex-direction:column;gap:2px;padding:12px;border-bottom:1px solid ${g.edge};">
-          <div style="font-size:11.5px;font-weight:600;color:${g.textFaint};">SELEÇÃO</div>
-          <div style="font-size:16.5px;font-weight:600;color:${g.text};">${selection.length} tabelas</div>
-          <div style="font-size:13px;color:${g.textMuted};">Shift+clique adiciona ou remove</div>
+          <div style="font-size:11.5px;font-weight:600;color:${g.textFaint};">SELECTION</div>
+          <div style="font-size:16.5px;font-weight:600;color:${g.text};">${selection.length} tables</div>
+          <div style="font-size:13px;color:${g.textMuted};">Shift+click adds or removes</div>
         </div>
-        <div class="dbm-section-hdr"><span>TABELAS</span></div>
+        <div class="dbm-section-hdr"><span>TABLES</span></div>
         <div style="display:flex;flex-direction:column;gap:2px;padding:0 12px;">${list}</div>
         <div style="padding:12px;">
           <button data-action="GroupSelection" style="width:100%;height:30px;border-radius:6px;border:none;background:${g.accent};color:${g.mode === 'dark' ? '#0a0a0b' : '#ffffff'};font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
             ${iconSvg('LayoutGrid', 14, 'currentColor')}
-            <span>Agrupar seleção</span>
+            <span>Group selection</span>
           </button>
         </div>
       </div>
@@ -199,7 +199,7 @@ export function renderInspectorPane(params: {
       `;
     });
     swatches += `
-      <button title="Sem cor" data-set-color="" data-table="${escHtml(table.name)}" style="width:22px;height:22px;border-radius:999px;background:transparent;border:1px solid ${g.edge};color:${g.textFaint};display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;">
+      <button title="No color" data-set-color="" data-table="${escHtml(table.name)}" style="width:22px;height:22px;border-radius:999px;background:transparent;border:1px solid ${g.edge};color:${g.textFaint};display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;">
         ${iconSvg('X', 12, g.textFaint)}
       </button>
     </div>`;
@@ -210,19 +210,19 @@ export function renderInspectorPane(params: {
         <div style="display:flex;align-items:center;gap:8px;padding:4px 12px 0 12px;">
           ${iconSvg('LayoutGrid', 14, g.textFaint)}
           <span style="flex:1;font-size:13px;color:${g.text};">${escHtml(group.name)}</span>
-          <button data-action="UngroupSelection" style="padding:2px 8px;border-radius:5px;border:1px solid ${g.edge};background:transparent;color:${g.textMuted};font-size:12px;cursor:pointer;">Desagrupar</button>
+          <button data-action="UngroupSelection" style="padding:2px 8px;border-radius:5px;border:1px solid ${g.edge};background:transparent;color:${g.textMuted};font-size:12px;cursor:pointer;">Ungroup</button>
         </div>
       `
-      : `<div style="padding:4px 12px 0 12px;font-size:12.5px;color:${g.textFaint};">Sem grupo · Shift+clique em outras tabelas e Ctrl+G para agrupar</div>`;
+      : `<div style="padding:4px 12px 0 12px;font-size:12.5px;color:${g.textFaint};">No group · Shift+click other tables and press Ctrl+G to group</div>`;
 
     // Seção Colunas
     let colsHtml = `
       <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;border-bottom:1px solid ${g.edgeSoft};font-size:10px;font-weight:600;color:${g.textFaint};">
-        <div style="flex:1;min-width:60px;">NOME</div>
-        <div data-col-splitter="true" title="Arrastar para redimensionar colunas (duplo-clique restaura)" style="width:8px;height:14px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;">
+        <div style="flex:1;min-width:60px;">NAME</div>
+        <div data-col-splitter="true" title="Drag to resize columns (double-click to reset)" style="width:8px;height:14px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;">
           <div style="width:1.5px;height:10px;background:${g.edge};"></div>
         </div>
-        <div style="width:${colTypeW}px;flex:none;">TIPO</div>
+        <div style="width:${colTypeW}px;flex:none;">TYPE</div>
         <div style="width:66px;flex:none;">FLAGS</div>
         <div style="width:18px;flex:none;"></div>
       </div>
@@ -248,11 +248,11 @@ export function renderInspectorPane(params: {
           <div data-col-splitter="true" style="width:4px;height:14px;cursor:ew-resize;flex:none;"></div>
           <div style="width:${colTypeW}px;flex:none;overflow:hidden;">${typeField}</div>
           <div style="display:flex;gap:3px;flex:none;">
-            <button class="dbm-chip ${c.pk ? 'on' : ''}" title="Chave primária" data-toggle-flag="pk" data-table="${escHtml(table.name)}" data-col="${escHtml(c.name)}" data-val="${!c.pk}">PK</button>
-            <button class="dbm-chip ${c.not_null ? 'on' : ''}" title="Obrigatória (not null)" data-toggle-flag="not null" data-table="${escHtml(table.name)}" data-col="${escHtml(c.name)}" data-val="${!c.not_null}">NN</button>
-            <button class="dbm-chip ${c.unique ? 'on' : ''}" title="Valor único" data-toggle-flag="unique" data-table="${escHtml(table.name)}" data-col="${escHtml(c.name)}" data-val="${!c.unique}">UQ</button>
+            <button class="dbm-chip ${c.pk ? 'on' : ''}" title="Primary key" data-toggle-flag="pk" data-table="${escHtml(table.name)}" data-col="${escHtml(c.name)}" data-val="${!c.pk}">PK</button>
+            <button class="dbm-chip ${c.not_null ? 'on' : ''}" title="Required (not null)" data-toggle-flag="not null" data-table="${escHtml(table.name)}" data-col="${escHtml(c.name)}" data-val="${!c.not_null}">NN</button>
+            <button class="dbm-chip ${c.unique ? 'on' : ''}" title="Unique value" data-toggle-flag="unique" data-table="${escHtml(table.name)}" data-col="${escHtml(c.name)}" data-val="${!c.unique}">UQ</button>
           </div>
-          <button class="dbm-insp-col-del" title="Excluir coluna" data-del-col="${escHtml(c.name)}" data-table="${escHtml(table.name)}">
+          <button class="dbm-insp-col-del" title="Delete column" data-del-col="${escHtml(c.name)}" data-table="${escHtml(table.name)}">
             ${iconSvg('Trash', 13, 'currentColor')}
           </button>
         </div>
@@ -269,7 +269,7 @@ export function renderInspectorPane(params: {
         }
         for (const en of enums) {
           if (!q || en.toLowerCase().includes(q)) {
-            suggestions.push([en, 'enumeração']);
+            suggestions.push([en, 'enumeration']);
           }
         }
         const top = suggestions.slice(0, 8);
@@ -277,8 +277,8 @@ export function renderInspectorPane(params: {
           colsHtml += `
             <div id="dbm-type-suggestions" style="margin:4px 12px;padding:6px;border-radius:6px;background:${g.island};border:1px solid ${g.edge};box-shadow:${g.cardShadow};display:flex;flex-direction:column;gap:2px;">
               <div style="display:flex;justify-content:space-between;padding:0 4px 3px 4px;border-bottom:1px solid ${g.edgeSoft};font-size:10px;color:${g.textFaint};">
-                <span>Sugestões de tipo (clique para aplicar)</span>
-                <span>Esc fecha</span>
+                <span>Type suggestions (click to apply)</span>
+                <span>Esc closes</span>
               </div>
               ${top
                 .map(
@@ -300,7 +300,7 @@ export function renderInspectorPane(params: {
       <div style="padding:8px 12px;">
         <button data-add-col-table="${escHtml(table.name)}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid ${g.edge};background:transparent;color:${g.text};font-size:12.5px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
           ${iconSvg('Plus', 13, g.textMuted)}
-          <span>Adicionar coluna</span>
+          <span>Add column</span>
         </button>
       </div>
     `;
@@ -329,22 +329,22 @@ export function renderInspectorPane(params: {
     return `
       <div style="display:flex;flex-direction:column;">
         <div style="display:flex;flex-direction:column;gap:2px;padding:12px;border-bottom:1px solid ${g.edge};">
-          <div style="font-size:11.5px;font-weight:600;color:${g.textFaint};">TABELA</div>
+          <div style="font-size:11.5px;font-weight:600;color:${g.textFaint};">TABLE</div>
           <div style="font-size:16.5px;font-weight:600;color:${g.text};">${titleHtml}</div>
-          <div style="font-size:12.5px;color:${g.textMuted};">${table.columns.length} colunas · F2 renomeia</div>
+          <div style="font-size:12.5px;color:${g.textMuted};">${table.columns.length} columns · F2 to rename</div>
         </div>
-        <div class="dbm-section-hdr"><span>COR</span></div>
+        <div class="dbm-section-hdr"><span>COLOR</span></div>
         ${swatches}
-        <div class="dbm-section-hdr"><span>GRUPO</span></div>
+        <div class="dbm-section-hdr"><span>GROUP</span></div>
         ${groupHtml}
-        <div class="dbm-section-hdr"><span>COLUNAS</span></div>
+        <div class="dbm-section-hdr"><span>COLUMNS</span></div>
         ${colsHtml}
-        <div class="dbm-section-hdr"><span>RELAÇÕES</span></div>
+        <div class="dbm-section-hdr"><span>RELATIONS</span></div>
         ${relsHtml}
         <div style="padding:12px;margin-top:8px;border-top:1px solid ${g.edgeSoft};">
           <button data-action="DeleteSelection" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid ${hexWithAlpha(g.danger, 0.4)};background:transparent;color:${g.danger};font-size:12.5px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
             ${iconSvg('Trash', 13, g.danger)}
-            <span>Excluir tabela</span>
+            <span>Delete table</span>
           </button>
         </div>
       </div>
@@ -353,24 +353,24 @@ export function renderInspectorPane(params: {
 
   // Caso 3: Nada selecionado (`shell.rs` linhas 2837-2889)
   const tips: Array<[string, string[]]> = [
-    ['Selecionar', ['V']],
-    ['Mover a vista', ['H']],
-    ['Ajustar à tela', ['Shift', '1']],
-    ['Agrupar seleção', ['Ctrl', 'G']],
-    ['Editor DBML', ['Ctrl', 'E']],
-    ['Todos os comandos', ['Ctrl', 'K']],
+    ['Select', ['V']],
+    ['Pan view', ['H']],
+    ['Fit to screen', ['Shift', '1']],
+    ['Group selection', ['Ctrl', 'G']],
+    ['DBML Editor', ['Ctrl', 'E']],
+    ['All commands', ['Ctrl', 'K']],
   ];
 
   return `
     <div style="display:flex;flex-direction:column;gap:6px;padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:14.5px;font-weight:600;color:${g.text};">Nada selecionado</span>
-        <button class="dbm-rail-btn" style="width:26px;height:26px;" title="Ocultar inspector (Ctrl+I)" data-action="ToggleInspector">
+        <span style="font-size:14.5px;font-weight:600;color:${g.text};">Nothing selected</span>
+        <button class="dbm-rail-btn" style="width:26px;height:26px;" title="Hide inspector (Ctrl+I)" data-action="ToggleInspector">
           ${iconSvg('PanelRightClose', 15, g.textMuted)}
         </button>
       </div>
       <div style="font-size:13px;color:${g.textMuted};line-height:1.45;">
-        Clique numa tabela para ver colunas, cor, grupo e relações. Shift+clique seleciona várias.
+        Click a table to view columns, color, group, and relations. Shift+click selects multiple.
       </div>
       <div style="height:1px;margin:8px 0;background:${g.edge};"></div>
       ${tips
@@ -421,11 +421,11 @@ export function renderPaletteModal(query: string, g: Glass): string {
       <div class="dbm-modal" onclick="event.stopPropagation()">
         <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid ${g.edge};">
           ${iconSvg('Search', 15, g.textFaint)}
-          <input id="dbm-palette-input" value="${escHtml(query)}" placeholder="Buscar comandos…" style="flex:1;background:transparent;border:none;outline:none;color:${g.text};font-size:14px;" />
+          <input id="dbm-palette-input" value="${escHtml(query)}" placeholder="Search commands…" style="flex:1;background:transparent;border:none;outline:none;color:${g.text};font-size:14px;" />
           <span class="dbm-kbd">Esc</span>
         </div>
         <div style="flex:1;overflow-y:auto;padding:6px 0;">
-          ${itemsHtml || `<div style="padding:16px;text-align:center;color:${g.textMuted};">Nenhum comando encontrado.</div>`}
+          ${itemsHtml || `<div style="padding:16px;text-align:center;color:${g.textMuted};">No commands found.</div>`}
         </div>
       </div>
     </div>
@@ -439,7 +439,7 @@ export function renderShortcutsModal(g: Glass): string {
     <div class="dbm-modal-backdrop" data-close-modal="true">
       <div class="dbm-modal" onclick="event.stopPropagation()">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid ${g.edge};">
-          <span style="font-size:15px;font-weight:600;color:${g.text};">Atalhos de teclado</span>
+          <span style="font-size:15px;font-weight:600;color:${g.text};">Keyboard Shortcuts</span>
           <button class="dbm-rail-btn" style="width:26px;height:26px;" data-close-modal="true">${iconSvg('X', 15, g.textMuted)}</button>
         </div>
         <div style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;">

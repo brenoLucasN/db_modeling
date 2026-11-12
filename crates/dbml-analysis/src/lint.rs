@@ -1,4 +1,4 @@
-//! Diagnósticos (lint) com intervalos de bytes, para o editor sublinhar.
+//! Diagnostics (lint) with byte ranges for editor underlining.
 
 use dbml_syntax::{SyntaxKind, SyntaxNode, SyntaxToken, parse};
 use std::collections::{HashMap, HashSet};
@@ -41,10 +41,10 @@ fn unquote(s: &str) -> &str {
     s.trim_matches(|c| c == '"' || c == '\'' || c == '`')
 }
 
-/// Palavras de topo que o parser ainda não modela, mas que são DBML válido.
+/// Top-level keywords not yet modeled in the AST, but valid in DBML.
 const KNOWN_TOP: [&str; 5] = ["enum", "project", "tablegroup", "note", "records"];
 
-/// Catálogo de tipos de dados SQL/DBML reconhecidos.
+/// Catalog of recognized SQL/DBML data types.
 const KNOWN_TYPES: &[&str] = &[
     "int",
     "integer",
@@ -177,13 +177,10 @@ fn check_column_type(
     if !is_known {
         let msg = match suggest_type(&base) {
             Some(sug) => format!(
-                "Tipo desconhecido `{}` na coluna `{cname}` (você quis dizer `{sug}`?)",
+                "Unknown type `{}` on column `{cname}` (did you mean `{sug}`?)",
                 base_tok.text()
             ),
-            None => format!(
-                "Tipo desconhecido `{}` na coluna `{cname}`",
-                base_tok.text()
-            ),
+            None => format!("Unknown type `{}` on column `{cname}`", base_tok.text()),
         };
         out.push(diag(range(base_tok), Severity::Error, msg));
     }
@@ -200,7 +197,7 @@ fn check_column_type(
                     out.push(diag(
                         range(&rest[0]),
                         Severity::Error,
-                        format!("Parâmetros vazios `()` no tipo `{}`", base_tok.text()),
+                        format!("Empty type parameters `()` in type `{}`", base_tok.text()),
                     ));
                 } else if inner
                     .iter()
@@ -210,7 +207,7 @@ fn check_column_type(
                         range(&inner[0]),
                         Severity::Error,
                         format!(
-                            "Tamanho/precisão inválido para o tipo `{}` (esperado número)",
+                            "Invalid size/precision for type `{}` (expected number)",
                             base_tok.text()
                         ),
                     ));
@@ -220,7 +217,7 @@ fn check_column_type(
                         range(extra),
                         Severity::Error,
                         format!(
-                            "Token inesperado `{}` após o tipo da coluna `{cname}`",
+                            "Unexpected token `{}` after column type on `{cname}`",
                             extra.text()
                         ),
                     ));
@@ -230,14 +227,14 @@ fn check_column_type(
                 out.push(diag(
                     range(&rest[l]),
                     Severity::Error,
-                    format!("Falta `)` nos parâmetros do tipo `{}`", base_tok.text()),
+                    format!("Missing `)` in type parameters for `{}`", base_tok.text()),
                 ));
             }
             (None, Some(r)) => {
                 out.push(diag(
                     range(&rest[r]),
                     Severity::Error,
-                    format!("`)` inesperado no tipo da coluna `{cname}`"),
+                    format!("Unexpected `)` in column type on `{cname}`"),
                 ));
             }
             _ => {
@@ -245,7 +242,7 @@ fn check_column_type(
                     range(&rest[0]),
                     Severity::Error,
                     format!(
-                        "Token inesperado `{}` após o tipo `{}` na coluna `{cname}`",
+                        "Unexpected token `{}` after type `{}` on column `{cname}`",
                         rest[0].text(),
                         base_tok.text()
                     ),
@@ -268,7 +265,7 @@ fn check_column_settings(
         out.push(diag(
             range(&ct[open_idx]),
             Severity::Error,
-            "Falta `]` para fechar as configurações",
+            "Missing `]` to close settings",
         ));
         return;
     };
@@ -278,7 +275,7 @@ fn check_column_settings(
             range(extra),
             Severity::Error,
             format!(
-                "Token inesperado `{}` após `]` na coluna `{cname}`",
+                "Unexpected token `{}` after `]` on column `{cname}`",
                 extra.text()
             ),
         ));
@@ -288,7 +285,7 @@ fn check_column_settings(
         out.push(diag(
             range(&ct[open_idx]),
             Severity::Warning,
-            format!("Bloco de configurações `[]` vazio na coluna `{cname}`"),
+            format!("Empty settings block `[]` on column `{cname}`"),
         ));
         return;
     }
@@ -313,7 +310,7 @@ fn check_column_settings(
                         range(extra),
                         Severity::Error,
                         format!(
-                            "Token inesperado `{}` após `{kw}` (use vírgula para separar opções)",
+                            "Unexpected token `{}` after `{kw}` (use a comma to separate options)",
                             extra.text()
                         ),
                     ));
@@ -329,7 +326,7 @@ fn check_column_settings(
                     out.push(diag(
                         range(first),
                         Severity::Error,
-                        "Configuração incompleta: esperado `primary key` ou `pk`",
+                        "Incomplete setting: expected `primary key` or `pk`",
                     ));
                 }
             }
@@ -339,7 +336,7 @@ fn check_column_settings(
                     out.push(diag(
                         range(extra),
                         Severity::Error,
-                        format!("Token inesperado `{}` após `null`", extra.text()),
+                        format!("Unexpected token `{}` after `null`", extra.text()),
                     ));
                 }
             }
@@ -353,7 +350,7 @@ fn check_column_settings(
                     out.push(diag(
                         range(first),
                         Severity::Error,
-                        "Configuração incompleta: esperado `not null`",
+                        "Incomplete setting: expected `not null`",
                     ));
                 }
             }
@@ -364,7 +361,7 @@ fn check_column_settings(
                     out.push(diag(
                         range(first),
                         Severity::Error,
-                        format!("A configuração `{kw}:` exige um valor na coluna `{cname}`"),
+                        format!("Setting `{kw}:` requires a value on column `{cname}`"),
                     ));
                 }
             }
@@ -373,7 +370,7 @@ fn check_column_settings(
                     range(first),
                     Severity::Error,
                     format!(
-                        "Configuração desconhecida `{}` na coluna `{cname}` (esperado: pk, fk, not null, unique, increment, default, note, ref)",
+                        "Unknown setting `{}` on column `{cname}` (expected: pk, fk, not null, unique, increment, default, note, ref)",
                         first.text()
                     ),
                 ));
@@ -385,7 +382,7 @@ fn check_column_settings(
         out.push(diag(
             range(&ct[open_idx]),
             Severity::Error,
-            format!("Restrições conflitantes na coluna `{cname}`: não pode ser `null` e `not null`/`pk` simultaneamente"),
+            format!("Conflicting constraints on column `{cname}`: cannot be both `null` and `not null`/`pk`"),
         ));
     }
 }
@@ -410,7 +407,11 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
             .find(|k| k.kind() != SyntaxKind::Ident || !k.text().eq_ignore_ascii_case("table"))
             .filter(|k| matches!(k.kind(), SyntaxKind::Ident | SyntaxKind::Str))
         else {
-            out.push(diag(range(&toks[0]), Severity::Error, "Tabela sem nome"));
+            out.push(diag(
+                range(&toks[0]),
+                Severity::Error,
+                "Table without a name",
+            ));
             continue;
         };
         let name = unquote(name_tok.text()).to_string();
@@ -418,20 +419,20 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
             out.push(diag(
                 range(name_tok),
                 Severity::Error,
-                format!("Falta `{{` depois de `Table {name}`"),
+                format!("Missing `{{` after `Table {name}`"),
             ));
         } else if !head.iter().any(|k| k.kind() == SyntaxKind::RBrace) {
             out.push(diag(
                 range(name_tok),
                 Severity::Error,
-                format!("Tabela `{name}` não foi fechada com `}}`"),
+                format!("Table `{name}` was not closed with `}}`"),
             ));
         }
         if tables.contains_key(&name) {
             out.push(diag(
                 range(name_tok),
                 Severity::Error,
-                format!("Tabela `{name}` duplicada"),
+                format!("Duplicate table `{name}`"),
             ));
         }
         let mut cols = HashSet::new();
@@ -449,7 +450,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
                 out.push(diag(
                     range(first),
                     Severity::Error,
-                    format!("Coluna `{cname}` sem tipo"),
+                    format!("Column `{cname}` has no type"),
                 ));
             } else {
                 check_column_type(&cname, ty_toks, &enums, &mut out);
@@ -462,7 +463,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
                 out.push(diag(
                     range(first),
                     Severity::Error,
-                    format!("Coluna `{cname}` duplicada em `{name}`"),
+                    format!("Duplicate column `{cname}` in `{name}`"),
                 ));
             }
             if ct.iter().any(|k| {
@@ -478,7 +479,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
                 out.push(diag(
                     range(&ct[unopened_close]),
                     Severity::Error,
-                    "Colchete `]` sem `[` correspondente",
+                    "Closing bracket `]` without matching `[`",
                 ));
             }
         }
@@ -486,7 +487,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
             out.push(diag(
                 range(name_tok),
                 Severity::Info,
-                format!("`{name}` não tem chave primária"),
+                format!("`{name}` has no primary key"),
             ));
         }
         tables.insert(name, cols);
@@ -502,12 +503,12 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
                     None => out.push(diag(
                         range(&w[0]),
                         Severity::Error,
-                        format!("Tabela `{tn}` não existe"),
+                        format!("Table `{tn}` does not exist"),
                     )),
                     Some(cols) if !cols.contains(cn) => out.push(diag(
                         range(&w[2]),
                         Severity::Error,
-                        format!("Coluna `{cn}` não existe em `{tn}`"),
+                        format!("Column `{cn}` does not exist in `{tn}`"),
                     )),
                     _ => {}
                 }
@@ -520,7 +521,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
             out.push(diag(
                 range(&ts[0]),
                 Severity::Error,
-                "Esperado `Ref: tabela.coluna > tabela.coluna`",
+                "Expected `Ref: table.column > table.column`",
             ));
             continue;
         };
@@ -538,7 +539,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
             out.push(diag(
                 range(&ts[0]),
                 Severity::Error,
-                "Relação incompleta: esperado `Ref: tabela.coluna > tabela.coluna`",
+                "Incomplete relation: expected `Ref: table.column > table.column`",
             ));
         } else {
             let (ft, fc) = (unquote(body[0].text()), unquote(body[2].text()));
@@ -550,7 +551,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
                 out.push(diag(
                     range(&body[0]),
                     Severity::Error,
-                    format!("Uma coluna não pode referenciar a si mesma (`{ft}.{fc}`)"),
+                    format!("A column cannot reference itself (`{ft}.{fc}`)"),
                 ));
             } else if let (Some(t1), Some(t2)) = (
                 col_types.get(&(ft.to_string(), fc.to_string())),
@@ -561,7 +562,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
                     range(&body[2]),
                     Severity::Warning,
                     format!(
-                        "Tipos incompatíveis na relação: `{ft}.{fc}` é `{t1}`, mas `{tt}.{tc}` é `{t2}`"
+                        "Incompatible types in relation: `{ft}.{fc}` is `{t1}`, but `{tt}.{tc}` is `{t2}`"
                     ),
                 ));
             }
@@ -596,7 +597,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
             out.push(diag(
                 range(&toks[0]),
                 Severity::Error,
-                "Grupo (`TableGroup`) sem nome",
+                "TableGroup without a name",
             ));
             continue;
         };
@@ -605,7 +606,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
             out.push(diag(
                 range(gname_tok),
                 Severity::Error,
-                format!("Grupo `{gname}` não foi fechado com `}}`"),
+                format!("TableGroup `{gname}` was not closed with `}}`"),
             ));
         }
         for item in g.children().filter(|n| n.kind() == SyntaxKind::Column) {
@@ -616,7 +617,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
                     out.push(diag(
                         range(first),
                         Severity::Error,
-                        format!("Tabela `{tname}` listada no grupo `{gname}` não existe"),
+                        format!("Table `{tname}` listed in group `{gname}` does not exist"),
                     ));
                 }
             }
@@ -638,7 +639,7 @@ pub fn lint(text: &str) -> Vec<Diagnostic> {
                         out.push(diag(
                             range(&t),
                             Severity::Warning,
-                            format!("Construção não reconhecida: `{}`", t.text()),
+                            format!("Unrecognized construct: `{}`", t.text()),
                         ));
                     }
                     line_start = false;
@@ -668,9 +669,9 @@ mod tests {
     #[test]
     fn unknown_ref_targets() {
         let m = msgs("Table a {\n  id int [pk]\n}\nRef: a.id > x.id\nRef: a.nope > a.id\n");
-        assert!(m.contains(&"Tabela `x` não existe".to_string()), "{m:?}");
+        assert!(m.contains(&"Table `x` does not exist".to_string()), "{m:?}");
         assert!(
-            m.contains(&"Coluna `nope` não existe em `a`".to_string()),
+            m.contains(&"Column `nope` does not exist in `a`".to_string()),
             "{m:?}"
         );
     }
@@ -678,24 +679,22 @@ mod tests {
     #[test]
     fn structural_errors() {
         let m = msgs("Table a {\n  id\n  id int [pk\n");
-        assert!(m.iter().any(|s| s.contains("não foi fechada")), "{m:?}");
-        assert!(m.iter().any(|s| s.contains("sem tipo")), "{m:?}");
-        assert!(m.iter().any(|s| s.contains("duplicada")), "{m:?}");
-        assert!(m.iter().any(|s| s.contains("Falta `]`")), "{m:?}");
+        assert!(m.iter().any(|s| s.contains("was not closed")), "{m:?}");
+        assert!(m.iter().any(|s| s.contains("has no type")), "{m:?}");
+        assert!(m.iter().any(|s| s.contains("Duplicate")), "{m:?}");
+        assert!(m.iter().any(|s| s.contains("Missing `]`")), "{m:?}");
     }
 
     #[test]
     fn stray_text_and_missing_pk() {
         let m = msgs("blah\nEnum status {\n}\nTable a {\n  x int\n}\n");
         assert!(
-            m.iter().any(|s| s.contains("não reconhecida: `blah`")),
+            m.iter()
+                .any(|s| s.contains("Unrecognized construct: `blah`")),
             "{m:?}"
         );
         assert!(!m.iter().any(|s| s.contains("`Enum`")), "{m:?}");
-        assert!(
-            m.iter().any(|s| s.contains("não tem chave primária")),
-            "{m:?}"
-        );
+        assert!(m.iter().any(|s| s.contains("has no primary key")), "{m:?}");
     }
 
     #[test]
@@ -712,8 +711,8 @@ mod tests {
         let m = msgs(src);
         assert!(
             m.iter()
-                .any(|s| s.contains("Tipo desconhecido `timestam`") && s.contains("`timestamp`")),
-            "Deve acusar erro em timestam e sugerir timestamp: {m:?}"
+                .any(|s| s.contains("Unknown type `timestam`") && s.contains("`timestamp`")),
+            "Should report error on timestam and suggest timestamp: {m:?}"
         );
     }
 
@@ -721,24 +720,26 @@ mod tests {
     fn detects_malformed_type_params_and_settings() {
         let src = "Table users {\n  id int [pk, null]\n  email varchar() [uniq]\n  bio text [default:]\n}\n";
         let m = msgs(src);
-        assert!(m.iter().any(|s| s.contains("conflitantes")), "{m:?}");
-        assert!(m.iter().any(|s| s.contains("Parâmetros vazios")), "{m:?}");
         assert!(
-            m.iter()
-                .any(|s| s.contains("Configuração desconhecida `uniq`")),
+            m.iter().any(|s| s.contains("Conflicting constraints")),
             "{m:?}"
         );
-        assert!(m.iter().any(|s| s.contains("exige um valor")), "{m:?}");
+        assert!(
+            m.iter().any(|s| s.contains("Empty type parameters")),
+            "{m:?}"
+        );
+        assert!(
+            m.iter().any(|s| s.contains("Unknown setting `uniq`")),
+            "{m:?}"
+        );
+        assert!(m.iter().any(|s| s.contains("requires a value")), "{m:?}");
     }
 
     #[test]
     fn detects_ref_type_mismatch_and_self_ref() {
         let src = "Table a {\n  id int [pk]\n}\nTable b {\n  id int [pk]\n  a_id text\n}\nRef: b.a_id > a.id\nRef: a.id > a.id\n";
         let m = msgs(src);
-        assert!(m.iter().any(|s| s.contains("Tipos incompatíveis")), "{m:?}");
-        assert!(
-            m.iter().any(|s| s.contains("referenciar a si mesma")),
-            "{m:?}"
-        );
+        assert!(m.iter().any(|s| s.contains("Incompatible types")), "{m:?}");
+        assert!(m.iter().any(|s| s.contains("reference itself")), "{m:?}");
     }
 }
